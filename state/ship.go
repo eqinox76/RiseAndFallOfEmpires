@@ -1,4 +1,4 @@
-package model
+package state
 
 import pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
 

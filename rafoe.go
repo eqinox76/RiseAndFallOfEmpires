@@ -2,13 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/eqinox76/RiseAndFallOfEmpires/model"
+	"github.com/eqinox76/RiseAndFallOfEmpires/state"
 	"github.com/eqinox76/RiseAndFallOfEmpires/engine"
 )
 
 func main() {
 
-	space := model.NewSpace()
+	space := state.NewSpace()
 
 	for i:=0 ; i< 8 ; i++ {
 		bytes, _ := space.Serialize()
