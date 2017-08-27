@@ -12,8 +12,9 @@ message Planet{
 	string name = 1;
 	uint32 id = 2;
 	repeated uint64 orbiting = 3;
-	float controll = 4;
+	float control = 4;
 	uint32 empire = 5;
+
 }
 
 message Ship{
