@@ -12,15 +12,15 @@ message Planet{
 	string name = 1;
 	uint32 id = 2;
 	repeated uint64 orbiting = 3;
-	float controll = 3;
-	uint32 empire = 4;
+	float controll = 4;
+	uint32 empire = 5;
 }
 
 message Ship{
 	uint64 id = 1;
 	oneof position{
-		uint32 orbiting = 1;
-		Movement moving = 2;
+		uint32 orbiting = 2;
+		Movement moving = 3;
 	}
 }
 
@@ -29,3 +29,4 @@ message Movement{
 	uint32 end = 2;
 	double distance = 3;
 	double progress = 4;
+}
