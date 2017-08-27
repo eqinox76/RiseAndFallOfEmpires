@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package riseandfall;
+
+
+message Space{
+	repeated Planet planets = 1;
+	repeated Ship ships = 2;
+}
+
+message Planet{
+	string name = 1;
+	uint32 id = 2;
+	repeated uint64 orbiting = 3;
+	float controll = 3;
+	uint32 empire = 4;
+}
+
+message Ship{
+	uint64 id = 1;
+	oneof position{
+		uint32 orbiting = 1;
+		Movement moving = 2;
+	}
+}
+
+message Movement{
+	uint32 start = 1;
+	uint32 end = 2;
+	double distance = 3;
+	double progress = 4;
