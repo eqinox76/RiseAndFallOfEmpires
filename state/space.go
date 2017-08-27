@@ -4,6 +4,7 @@ import (
 	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
 	"github.com/golang/protobuf/proto"
 	"math/rand"
+	"github.com/pkg/errors"
 )
 
 type Space struct {
@@ -12,7 +13,6 @@ type Space struct {
 	nextShipId   uint64
 	nextPlanetId uint32
 }
-
 
 func NewSpace() Space {
 	space := Space{
@@ -39,17 +39,18 @@ func (space *Space) CreateShip(planet *Planet) Ship {
 	return s
 }
 
-func (space *Space) CreatePlanet(empire uint32) Planet {
+func (space *Space) CreatePlanet(empire uint32) *Planet {
 	id := space.nextPlanetId
 	space.nextPlanetId++
 	planet := Planet{
-		id: id,
+		id:      id,
 		Control: rand.Float32(),
+		Empire:  empire,
 	}
 
 	space.Planets = append(space.Planets, &planet)
 
-	return planet
+	return &planet
 }
 
 func (space *Space) Serialize() ([]byte, error) {
@@ -60,3 +61,20 @@ func (space *Space) Serialize() ([]byte, error) {
 	return proto.Marshal(&out)
 }
 
+func Deserialize(data *[]byte) (*Space, error) {
+	in := pb.Space{}
+	err := proto.Unmarshal(*data, &in)
+	if err != nil {
+		return nil, errors.Wrap(err, "Could not deserialize.")
+	}
+	space := NewSpace()
+
+	for _, planet := range in.Planets {
+		p := space.CreatePlanet(planet.Empire)
+		for _, _ = range planet.Orbiting{
+			space.CreateShip(p)
+		}
+	}
+
+	return &space, nil
+}
