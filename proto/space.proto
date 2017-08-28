@@ -11,9 +11,12 @@ message Space{
 message Planet{
 	string name = 1;
 	uint32 id = 2;
-	repeated uint64 orbiting = 3;
-	float control = 4;
-	uint32 empire = 5;
+	uint32 pos_x = 3;
+	uint32 pos_y = 4;
+	repeated uint64 orbiting = 5;
+	float control = 6;
+	uint32 empire = 7;
+    repeated uint32 connected = 8;
 
 }
 
@@ -28,6 +31,5 @@ message Ship{
 message Movement{
 	uint32 start = 1;
 	uint32 end = 2;
-	double distance = 3;
-	double progress = 4;
+	double traveled = 3;
 }
