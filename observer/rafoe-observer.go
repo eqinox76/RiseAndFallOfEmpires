@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"github.com/fogleman/gg"
 	"fmt"
-	"bytes"
-	"bufio"
 	"time"
 	"math/rand"
 )
@@ -26,20 +24,20 @@ func main() {
 		http.ListenAndServe(":8079", nil)
 	}()
 
-	go func() {
-		for true {
-			b := bytes.Buffer{}
-
-			writer := bufio.NewWriter(&b)
-			dc := gg.NewContext(1000, 1000)
-			dc.DrawCircle(500, 500, rand.Float64()*500)
-			dc.SetRGB(0, 0, 0)
-			dc.Fill()
-			dc.EncodePNG(writer)
-			result := b.Bytes()
-			renderedWorld = &result
-		}
-	}()
+	//go func() {
+	//	for true {
+	//		b := bytes.Buffer{}
+	//
+	//		writer := bufio.NewWriter(&b)
+	//		dc := gg.NewContext(1000, 1000)
+	//		dc.DrawCircle(500, 500, 200+rand.Float64()*200)
+	//		dc.SetRGB(0, 0, 0)
+	//		dc.Fill()
+	//		dc.EncodePNG(writer)
+	//		result := b.Bytes()
+	//		renderedWorld = &result
+	//	}
+	//}()
 
 	header := make([]byte, 4)
 	for true {
@@ -59,38 +57,43 @@ func main() {
 	}
 }
 
-func menuViewer(writer http.ResponseWriter, request *http.Request){
-data := `<html>
+func menuViewer(writer http.ResponseWriter, request *http.Request) {
+	data := `<html>
 
 <head>
-
-<script type="text/JavaScript">
-
-var timeoutPeriod = 1000;
-var imageURI = 'space.png';
-var img = new Image();
-img.onload = function() {
-    var canvas = document.getElementById("x");
-    var context = canvas.getContext("2d");
-
-    context.drawImage(img, 0, 0);
-    setTimeout(timedRefresh,timeoutPeriod);
-};
-
-function timedRefresh() {
-    // just change src attribute, will always trigger the onload callback
-    img.src = imageURI + '?d=' + Date.now();
-}
-
-</script>
 
 <title>JavaScript Refresh Example</title>
 
 </head>
 
-<body onload="JavaScript:timedRefresh(1000);">
+<body>
 
-<canvas id="x" width="600" height="600" />
+<canvas id="space" />
+
+<script type="text/JavaScript">
+
+var canvas = document.getElementById("space");
+canvas.width  = window.innerWidth;
+canvas.height = window.innerHeight;
+
+function update() {
+
+	var c = document.getElementById("space");
+	var ctx = c.getContext("2d");
+	var img = new Image();
+	img.src = 'space.png'
+	img.onload = function(){
+		ctx.clearRect(0, 0, c.width, c.height);
+		ctx.drawImage(img, 0, 0);
+	}
+
+	// keep going
+    requestAnimationFrame(update);
+}
+
+// schedule up the start
+window.requestAnimationFrame(update);
+</script>
 
 </body>
 </html>`
@@ -101,9 +104,14 @@ function timedRefresh() {
 func worldViewer(writer http.ResponseWriter, request *http.Request) {
 	start := time.Now()
 
-	pic := *renderedWorld
-	writer.Header().Set("Content-Type", "image/png") // set the content-type header
+	writer.Header().Set("Content-Type", "image/png")                            // set the content-type header
 	writer.Header().Set("Cache-Control", "no-cache, must-revalidate, no-store") // force no cache
-	writer.Write(pic)
+
+	dc := gg.NewContext(1000, 1000)
+	dc.DrawCircle(500, 500, 150+rand.Float64()*200)
+	dc.SetRGB(0, 0, 0)
+	dc.Fill()
+	dc.EncodePNG(writer)
+
 	fmt.Println(time.Now().Sub(start))
 }
