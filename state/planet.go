@@ -9,6 +9,8 @@ type Planet struct {
 	orbiting []*Ship
 	Control  float32
 	Empire   uint32
+	X        uint32
+	Y        uint32
 }
 
 func (planet *Planet) Serialize() *pb.Planet {
@@ -16,6 +18,8 @@ func (planet *Planet) Serialize() *pb.Planet {
 		Id:      planet.id,
 		Control: planet.Control,
 		Empire:  planet.Empire,
+		PosX:    planet.X,
+		PosY:    planet.Y,
 	}
 
 	for _, s := range planet.orbiting {

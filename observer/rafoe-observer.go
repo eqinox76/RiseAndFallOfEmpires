@@ -7,7 +7,6 @@ import (
 	"github.com/ajstarks/svgo"
 	"fmt"
 	"time"
-	"math/rand"
 	"bytes"
 	"bufio"
 	"sync"
@@ -82,12 +81,16 @@ func main() {
 	}
 }
 func render(writer *bufio.Writer, space *state.Space) {
-	width := 1000
-	height := 500
+	width := int(space.Width)
+	height := int(space.Height)
+
 	canvas := svg.New(writer)
 	canvas.Start(width, height)
-	canvas.Circle(width/2, height/2, 50+rand.Int()%100)
-	canvas.Text(width/2, height/2, "Hello, SVG", "text-anchor:middle;font-size:30px;fill:white")
+	for _, planet := range space.Planets{
+		canvas.Circle(int(planet.X), int(planet.Y), 10, "fill: none; stroke: black; stroke-width: 1")
+		canvas.Circle(int(planet.X), int(planet.Y), 10, fmt.Sprintf("fill-opacity: %f", planet.Control))
+	}
+
 	canvas.End()
 	writer.Flush()
 }
