@@ -8,9 +8,15 @@ import (
 	"fmt"
 	"time"
 	"math/rand"
+	"bytes"
+	"bufio"
+	"sync"
+
+	"github.com/eqinox76/RiseAndFallOfEmpires/state"
 )
 
-var renderedWorld *[]byte
+var registered []chan []byte
+var mux sync.Mutex
 
 func main() {
 	conn, err := net.Dial("tcp", "localhost:9076")
@@ -18,34 +24,35 @@ func main() {
 		panic(err)
 	}
 
+	// start server
 	go func() {
 		http.HandleFunc("/space.svg", worldViewer)
 		http.HandleFunc("/main", menuViewer)
 		http.ListenAndServe(":8079", nil)
 	}()
 
-	//go func() {
-	//	for true {
-	//		b := bytes.Buffer{}
-	//
-	//		writer := bufio.NewWriter(&b)
-	//		dc := gg.NewContext(1000, 1000)
-	//		dc.DrawCircle(500, 500, 200+rand.Float64()*200)
-	//		dc.SetRGB(0, 0, 0)
-	//		dc.Fill()
-	//		dc.EncodePNG(writer)
-	//		result := b.Bytes()
-	//		renderedWorld = &result
-	//	}
-	//}()
-
+	// parse data and render it
 	header := make([]byte, 4)
 	for true {
 		// read len
+		if conn == nil {
+			conn, err = net.Dial("tcp", "localhost:9076")
+			if err != nil {
+				fmt.Println(err)
+				conn = nil
+				time.Sleep(500 * time.Millisecond)
+				continue
+			}
+		}
 
 		_, err := conn.Read(header)
 		if err != nil {
-			panic(err)
+			fmt.Println(err)
+			time.Sleep(500 * time.Millisecond)
+			conn.Close()
+			conn = nil
+
+			continue
 		}
 		l := binary.LittleEndian.Uint32(header)
 
@@ -54,7 +61,35 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+
+		space, err := state.Deserialize(&msgbuffer)
+		if err != nil{
+			panic(err)
+		}
+
+		var b bytes.Buffer
+		writer := bufio.NewWriter(&b)
+		render(writer, space)
+
+		mux.Lock()
+		for _, c := range (registered) {
+			data := b.Bytes()
+			c <- data
+			close(c)
+		}
+		registered = nil
+		mux.Unlock()
 	}
+}
+func render(writer *bufio.Writer, space *state.Space) {
+	width := 1000
+	height := 500
+	canvas := svg.New(writer)
+	canvas.Start(width, height)
+	canvas.Circle(width/2, height/2, 50+rand.Int()%100)
+	canvas.Text(width/2, height/2, "Hello, SVG", "text-anchor:middle;font-size:30px;fill:white")
+	canvas.End()
+	writer.Flush()
 }
 
 func menuViewer(writer http.ResponseWriter, request *http.Request) {
@@ -103,17 +138,16 @@ window.requestAnimationFrame(update);
 
 func worldViewer(writer http.ResponseWriter, request *http.Request) {
 	start := time.Now()
+	c := make(chan []byte)
+	mux.Lock()
+	registered = append(registered, c)
+	mux.Unlock()
 
-	writer.Header().Set("Content-Type", "image/svg+xml")                            // set the content-type header
+	writer.Header().Set("Content-Type", "image/svg+xml")                        // set the content-type header
 	writer.Header().Set("Cache-Control", "no-cache, must-revalidate, no-store") // force no cache
 
-	width := 500
-	height := 500
-	canvas := svg.New(writer)
-	canvas.Start(width, height)
-	canvas.Circle(width/2, height/2, 50 + rand.Int() % 100)
-	canvas.Text(width/2, height/2, "Hello, SVG", "text-anchor:middle;font-size:30px;fill:white")
-	canvas.End()
+	data := <- c
+	writer.Write(data)
 
 	fmt.Println(time.Now().Sub(start))
 }
