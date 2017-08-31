@@ -4,7 +4,7 @@ import (
 	"net"
 	"encoding/binary"
 	"net/http"
-	"github.com/fogleman/gg"
+	"github.com/ajstarks/svgo"
 	"fmt"
 	"time"
 	"math/rand"
@@ -19,7 +19,7 @@ func main() {
 	}
 
 	go func() {
-		http.HandleFunc("/space.png", worldViewer)
+		http.HandleFunc("/space.svg", worldViewer)
 		http.HandleFunc("/main", menuViewer)
 		http.ListenAndServe(":8079", nil)
 	}()
@@ -81,7 +81,7 @@ function update() {
 	var c = document.getElementById("space");
 	var ctx = c.getContext("2d");
 	var img = new Image();
-	img.src = 'space.png'
+	img.src = 'space.svg'
 	img.onload = function(){
 		ctx.clearRect(0, 0, c.width, c.height);
 		ctx.drawImage(img, 0, 0);
@@ -104,14 +104,16 @@ window.requestAnimationFrame(update);
 func worldViewer(writer http.ResponseWriter, request *http.Request) {
 	start := time.Now()
 
-	writer.Header().Set("Content-Type", "image/png")                            // set the content-type header
+	writer.Header().Set("Content-Type", "image/svg+xml")                            // set the content-type header
 	writer.Header().Set("Cache-Control", "no-cache, must-revalidate, no-store") // force no cache
 
-	dc := gg.NewContext(1000, 1000)
-	dc.DrawCircle(500, 500, 150+rand.Float64()*200)
-	dc.SetRGB(0, 0, 0)
-	dc.Fill()
-	dc.EncodePNG(writer)
+	width := 500
+	height := 500
+	canvas := svg.New(writer)
+	canvas.Start(width, height)
+	canvas.Circle(width/2, height/2, 50 + rand.Int() % 100)
+	canvas.Text(width/2, height/2, "Hello, SVG", "text-anchor:middle;font-size:30px;fill:white")
+	canvas.End()
 
 	fmt.Println(time.Now().Sub(start))
 }

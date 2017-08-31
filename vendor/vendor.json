@@ -3,10 +3,10 @@
 	"ignore": "test",
 	"package": [
 		{
-			"checksumSHA1": "U5tK4cmCTiqcLbCFD1xypdh3v8k=",
-			"path": "github.com/fogleman/gg",
-			"revision": "e611489b8685808726d3f603571b763982d92f67",
-			"revisionTime": "2017-07-28T22:55:21Z"
+			"checksumSHA1": "r+Oj7bxw0p0y15YHlN9soV5L+c4=",
+			"path": "github.com/ajstarks/svgo",
+			"revision": "fec71ff44529c89ddb4211a62f3d672f31e50bc5",
+			"revisionTime": "2017-05-24T22:37:13Z"
 		},
 		{
 			"checksumSHA1": "yqF125xVSkmfLpIVGrLlfE05IUk=",
