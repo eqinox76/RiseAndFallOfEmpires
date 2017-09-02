@@ -88,8 +88,14 @@ func render(writer *bufio.Writer, space *pb.Space) {
 	canvas := svg.New(writer)
 	canvas.Start(width, height)
 	for _, planet := range space.Planets{
+		// render planet
 		canvas.Circle(int(planet.PosX), int(planet.PosY), 10, "fill: none; stroke: black; stroke-width: 1")
 		canvas.Circle(int(planet.PosX), int(planet.PosY), 10, fmt.Sprintf("fill-opacity: %f", planet.Control))
+
+		// render connection
+		for _, id := range planet.Connected {
+			canvas.Line(int(planet.PosX), int(planet.PosY), int(space.Planets[id].PosX), int(space.Planets[id].PosY), "stroke:black; stroke-width:2")
+		}
 	}
 
 	canvas.End()

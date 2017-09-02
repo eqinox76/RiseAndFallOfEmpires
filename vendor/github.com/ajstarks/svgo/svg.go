@@ -445,7 +445,7 @@ func (svg *SVG) RGBA(r int, g int, b int, a float64) string {
 // Gradients
 
 // LinearGradient constructs a linear color gradient identified by id,
-// along the vector defined by (x1,y1), and (x2,y2).
+// along the vector.go defined by (x1,y1), and (x2,y2).
 // The stop color sequence defined in sc. Coordinates are expressed as percentages.
 func (svg *SVG) LinearGradient(id string, x1, y1, x2, y2 uint8, sc []Offcolor) {
 	svg.printf("<linearGradient id=\"%s\" x1=\"%d%%\" y1=\"%d%%\" x2=\"%d%%\" y2=\"%d%%\">\n",
