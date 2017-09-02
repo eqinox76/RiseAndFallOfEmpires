@@ -7,7 +7,6 @@ import (
 	"net"
 	"os"
 	"sync"
-	"encoding/binary"
 	"time"
 )
 
@@ -75,7 +74,7 @@ func main() {
 	}()
 
 	for true {
-		bytes, _ := space.Serialize()
+		bytes, _ := state.Serialize(&space)
 		fmt.Printf("serialize: %d, Planets: %d Ships: %d\n", len(bytes), len(space.Planets), len(space.Ships))
 		engine.Step(&space)
 		time.Sleep(1 * time.Second)
@@ -87,15 +86,7 @@ func main() {
 func send(con net.Conn, worker *Worker) {
 	for msg := range worker.input {
 
-		length := make([]byte, 4)
-		binary.LittleEndian.PutUint32(length, uint32(len(msg)))
-		_, err := con.Write(length)
-
-		if err != nil{
-			break
-		}
-
-		_, err = con.Write(msg)
+		_, err := con.Write(msg)
 
 		if err != nil{
 			break

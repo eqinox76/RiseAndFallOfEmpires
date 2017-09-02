@@ -10,8 +10,8 @@ import (
 	"bytes"
 	"bufio"
 	"sync"
-
-	"github.com/eqinox76/RiseAndFallOfEmpires/state"
+	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
+	"github.com/golang/protobuf/proto"
 )
 
 var registered []chan []byte
@@ -61,14 +61,15 @@ func main() {
 			panic(err)
 		}
 
-		space, err := state.Deserialize(&msgbuffer)
-		if err != nil{
+		space := pb.Space{}
+		err = proto.Unmarshal(msgbuffer, &space)
+		if err != nil {
 			panic(err)
 		}
 
 		var b bytes.Buffer
 		writer := bufio.NewWriter(&b)
-		render(writer, space)
+		render(writer, &space)
 
 		mux.Lock()
 		for _, c := range (registered) {
@@ -80,15 +81,15 @@ func main() {
 		mux.Unlock()
 	}
 }
-func render(writer *bufio.Writer, space *state.Space) {
+func render(writer *bufio.Writer, space *pb.Space) {
 	width := int(space.Width)
 	height := int(space.Height)
 
 	canvas := svg.New(writer)
 	canvas.Start(width, height)
 	for _, planet := range space.Planets{
-		canvas.Circle(int(planet.X), int(planet.Y), 10, "fill: none; stroke: black; stroke-width: 1")
-		canvas.Circle(int(planet.X), int(planet.Y), 10, fmt.Sprintf("fill-opacity: %f", planet.Control))
+		canvas.Circle(int(planet.PosX), int(planet.PosY), 10, "fill: none; stroke: black; stroke-width: 1")
+		canvas.Circle(int(planet.PosX), int(planet.PosY), 10, fmt.Sprintf("fill-opacity: %f", planet.Control))
 	}
 
 	canvas.End()

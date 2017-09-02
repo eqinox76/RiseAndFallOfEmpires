@@ -4,50 +4,45 @@ import (
 	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
 	"github.com/golang/protobuf/proto"
 	"math/rand"
-	"github.com/pkg/errors"
 	"time"
+
+	"encoding/binary"
 )
 
-type Space struct {
-	Planets []*Planet
-	Ships   []*Ship
-	Width   uint32
-	Height  uint32
-}
-
-func NewSpace() Space {
+func NewSpace() pb.Space {
 	rand.Seed(time.Now().UTC().UnixNano())
-	space := Space{
+	space := pb.Space{
 		Width: 1400,
 		Height: 500,
 	}
 
 	for i := uint32(0); i < 150; i++ {
-		space.CreateNewPlanet();
+		CreateNewPlanet(&space);
 	}
 
 	return space
 }
 
-func (space *Space) CreateShip(planet *Planet) Ship {
+func CreateShip(space *pb.Space, planet *pb.Planet) *pb.Ship {
 	var id uint64 = 0
 	if space.Ships != nil {
 		id = space.Ships[len(space.Ships)-1].Id
 		id++
 	}
 
-	s := Ship{
+	s := pb.Ship{
 		Id: id,
 	}
+
 	space.Ships = append(space.Ships, &s)
-	planet.orbiting = append(planet.orbiting, &s)
-	return s
+	planet.Orbiting = append(planet.Orbiting, s.Id)
+	return &s
 }
 
-func (space *Space) CreateNewPlanet() *Planet {
+func CreateNewPlanet(space *pb.Space) *pb.Planet {
 	var id uint32 = 0
 	if space.Planets != nil {
-		id = space.Planets[len(space.Planets)-1].id
+		id = space.Planets[len(space.Planets)-1].Id
 		id++
 	}
 
@@ -63,16 +58,16 @@ func (space *Space) CreateNewPlanet() *Planet {
 		}
 
 		for _, planet := range space.Planets{
-			if x == planet.X || y == planet.Y{
+			if x == planet.PosX || y == planet.PosY {
 				continue
 			}
 		}
 		break
 	}
-	planet := Planet{
-		id: id,
-		X:  x,
-		Y:  y,
+	planet := pb.Planet{
+		Id: id,
+		PosX:  x,
+		PosY:  y,
 		Control: rand.Float32(),
 	}
 
@@ -81,43 +76,15 @@ func (space *Space) CreateNewPlanet() *Planet {
 	return &planet
 }
 
-func (space *Space) Serialize() ([]byte, error) {
-	out := pb.Space{
-		Width:space.Width,
-		Height:space.Height,
-	}
-	for _, planet := range space.Planets {
-		out.Planets = append(out.Planets, planet.Serialize())
-	}
-	return proto.Marshal(&out)
-}
+func Serialize(space *pb.Space) ([]byte, error) {
 
-func Deserialize(data *[]byte) (*Space, error) {
-	in := pb.Space{}
-	err := proto.Unmarshal(*data, &in)
+	data, err := proto.Marshal(space)
 	if err != nil {
-		return nil, errors.Wrap(err, "Could not deserialize.")
+		return nil, err
 	}
 
-	space := Space{
-		Width: in.Width,
-		Height: in.Height,
-	}
+	length := make([]byte, 4)
+	binary.LittleEndian.PutUint32(length, uint32(len(data)))
 
-	for _, planet := range in.Planets {
-		p := Planet{
-			id: planet.Id,
-			X: planet.PosX,
-			Y: planet.PosY,
-			Empire: planet.Empire,
-			Control: planet.Control,
-		}
-
-		space.Planets = append(space.Planets, &p)
-		for _, _ = range planet.Orbiting {
-			space.CreateShip(&p)
-		}
-	}
-
-	return &space, nil
+	return append(length, data...), nil
 }
