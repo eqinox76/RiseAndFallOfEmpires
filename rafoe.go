@@ -77,7 +77,7 @@ func main() {
 		bytes, _ := state.Serialize(&space)
 		fmt.Printf("serialize: %d, Planets: %d Ships: %d\n", len(bytes), len(space.Planets), len(space.Ships))
 		engine.Step(&space)
-		time.Sleep(1 * time.Second)
+		time.Sleep(500 * time.Millisecond)
 		fanOut <- bytes
 	}
 

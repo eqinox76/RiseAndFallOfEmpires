@@ -9,18 +9,20 @@ import (
 	"github.com/dhconnelly/rtreego"
 
 	"encoding/binary"
+	"sort"
 )
 
-type Space struct{
+type Space struct {
 	pb.Space
 	PlanetTree *rtreego.Rtree
+	Graph      Graph
 }
 
 type PlanetPos struct {
 	*pb.Planet
 }
 
-func (p PlanetPos) Bounds() *rtreego.Rect{
+func (p PlanetPos) Bounds() *rtreego.Rect {
 	return rtreego.Point{float64(p.PosX), float64(p.PosY)}.ToRect(0)
 }
 
@@ -28,7 +30,7 @@ func NewSpace() Space {
 	rand.Seed(time.Now().UTC().UnixNano())
 	space := Space{
 		Space: pb.Space{
-			Width: 1000,
+			Width:  1000,
 			Height: 500,
 		},
 		PlanetTree: rtreego.NewTree(2, 32, 64),
@@ -39,14 +41,62 @@ func NewSpace() Space {
 		CreateNewPlanet(&space)
 	}
 
-	// add lanes between planets
+	space.Graph = NewGraph(space.Planets)
+	// add the shortes paths until we have all nodes connected and do not add edges which add a cycle
+	var edges Edges
 	for _, planet := range space.Planets{
-		nn := space.PlanetTree.NearestNeighbors(2, rtreego.Point{float64(planet.PosX), float64(planet.PosY)})
-		ppos, ok := nn[1].(*PlanetPos)
-		if !ok{
-			panic(nn[1])
+		for _, to := range space.Planets{
+			if planet.Id >= to.Id{
+				continue
+			}
+			edges = append(edges, edge{planet.Id, to.Id, asVec(planet).Dist(asVec(to))})
 		}
-		planet.Connected = append(planet.Connected, ppos.Id)
+	}
+
+	// sort the edged
+	sort.Sort(edges)
+
+	// add lanes between planets
+	// this is done by adding all edged for a minimal spanning tree based on distance
+	// thereafter some planets are randomly connected with their n-nrearest neighbors but with decreasing likelyhood
+	root := space.Planets[0]
+	for _, edge := range edges{
+		if space.Graph.GraphSize(root) == len(space.Planets){
+			// done
+			break;
+		}
+
+		// add edge
+		from := space.Planets[edge.from]
+		to := space.Planets[edge.to]
+		from.Connected = append(from.Connected, to.Id)
+		to.Connected = append(to.Connected, from.Id)
+
+		// check if cycling
+		if space.Graph.HasCycle(from){
+			from.Connected = from.Connected[: len(from.Connected) - 1]
+			to.Connected = to.Connected[: len(to.Connected) - 1]
+		}
+	}
+
+	for size := 1; size < 3; size++ {
+		for _, planet := range space.Planets {
+			if len(planet.Connected) == size {
+				if rand.Intn(4) <= size{
+					continue
+				}
+
+				nn := space.PlanetTree.NearestNeighbors(size+2, rtreego.Point{float64(planet.PosX), float64(planet.PosY)})
+
+				to, ok := nn[size+1].(*PlanetPos)
+				if ! ok {
+					panic(nn[size+1])
+				}
+
+				planet.Connected = append(planet.Connected, to.Id)
+				to.Connected = append(to.Connected, planet.Id)
+			}
+		}
 	}
 
 	return space
