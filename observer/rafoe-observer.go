@@ -91,10 +91,16 @@ func render(writer *bufio.Writer, space *pb.Space) {
 		// render planet
 		canvas.Circle(int(planet.PosX), int(planet.PosY), 10, "fill: none; stroke: black; stroke-width: 1")
 		canvas.Circle(int(planet.PosX), int(planet.PosY), 10, fmt.Sprintf("fill-opacity: %f", planet.Control))
+		// show id
+		canvas.Text(int(planet.PosX), int(planet.PosY) - 20, fmt.Sprint("Id:", planet.Id), "text-anchor:middle;font-size:10px;fill:green")
+		// show control
+		canvas.Text(int(planet.PosX), int(planet.PosY) + 20, fmt.Sprint("Control:", planet.Control), "text-anchor:middle;font-size:10px;fill:green")
+		// show ships
+		canvas.Text(int(planet.PosX), int(planet.PosY) - 10, fmt.Sprint("#Ships:", len(planet.Orbiting)), "text-anchor:middle;font-size:10px;fill:green")
 
 		// render connection
 		for _, id := range planet.Connected {
-			canvas.Line(int(planet.PosX), int(planet.PosY), int(space.Planets[id].PosX), int(space.Planets[id].PosY), "stroke:black; stroke-width:2")
+			canvas.Line(int(planet.PosX), int(planet.PosY), int(space.Planets[id].PosX), int(space.Planets[id].PosY), "stroke:blue; stroke-width:2; stroke-opacity: 0.2")
 		}
 	}
 
