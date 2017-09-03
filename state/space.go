@@ -144,7 +144,7 @@ func CreateNewPlanet(space *Space) *pb.Planet {
 		vec := v.Vec{float64(x), float64(y)}
 		for _, planet := range space.Planets {
 
-			if vec.Dist(asVec(planet)) < 40 {
+			if vec.Dist(asVec(planet)) < 50 {
 				valid = false
 				break
 			}
