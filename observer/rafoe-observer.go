@@ -12,12 +12,16 @@ import (
 	"sync"
 	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
 	"github.com/golang/protobuf/proto"
+	"math/rand"
+	"math"
 )
 
 var registered []chan []byte
 var mux sync.Mutex
 
 func main() {
+	rand.Seed(time.Now().UTC().UnixNano())
+
 	conn, err := net.Dial("tcp", "localhost:9076")
 	if err != nil {
 		panic(err)
@@ -102,12 +106,14 @@ func render(writer *bufio.Writer, space *pb.Space) {
 			canvas.Text(int(planet.PosX), int(planet.PosY)-20, fmt.Sprint("Id:", planet.Id), "text-anchor:middle;font-size:10px;fill:green")
 			// show control
 			canvas.Text(int(planet.PosX), int(planet.PosY)+20, fmt.Sprint("Control:", planet.Control), "text-anchor:middle;font-size:10px;fill:green")
-		}
-		if len(planet.Orbiting) > 0 {
 			// show ships
 			canvas.Text(int(planet.PosX), int(planet.PosY)-10, fmt.Sprint("#Ships:", len(planet.Orbiting)), "text-anchor:middle;font-size:10px;fill:green")
 		}
 
+		for _, ship := range planet.Orbiting{
+			degree := 2 * math.Pi * rand.Float64()
+			canvas.Circle(int(float64(planet.PosX) + (14 * math.Sin(degree))), int(float64(planet.PosY) + (14 * math.Cos(degree))) , 1, fmt.Sprintf("stroke: %s; stroke-width: 1", space.Empires[space.Ships[ship].Empire].Color))
+		}
 	}
 
 	canvas.End()
