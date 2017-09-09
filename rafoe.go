@@ -73,7 +73,7 @@ func main() {
 
 	}()
 
-	for true {
+	for {
 		bytes, _ := state.Serialize(&space)
 		fmt.Printf("serialize: %d, Planets: %d Ships: %d\n", len(bytes), len(space.Planets), len(space.Ships))
 		engine.Step(&space)

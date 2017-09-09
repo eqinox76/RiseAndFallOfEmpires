@@ -32,7 +32,7 @@ func main() {
 
 	// parse data and render it
 	header := make([]byte, 4)
-	for true {
+	for {
 		// read len
 		if conn == nil {
 			conn, err = net.Dial("tcp", "localhost:9076")

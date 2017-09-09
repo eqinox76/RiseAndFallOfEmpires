@@ -6,8 +6,9 @@ package riseandfall;
 message Space{
 	repeated Planet planets = 1;
 	repeated Ship ships = 2;
-    uint32 width = 3;
-    uint32 height = 4;
+	repeated Empire empires = 3;
+    uint32 width = 4;
+    uint32 height = 5;
 }
 
 message Planet{
@@ -28,10 +29,19 @@ message Ship{
 		uint32 orbiting = 2;
 		Movement moving = 3;
 	}
+	uint32 empire = 4;
 }
 
 message Movement{
 	uint32 start = 1;
 	uint32 end = 2;
 	double traveled = 3;
+}
+
+message Empire{
+	uint32 id = 1;
+	bool passive = 2;
+	repeated uint64 ships = 3;
+	repeated uint32 planets = 4;
+	string color = 5;
 }

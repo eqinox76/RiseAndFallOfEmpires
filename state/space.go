@@ -3,6 +3,7 @@ package state
 import (
 	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
 	v "github.com/eqinox76/RiseAndFallOfEmpires/vector"
+	"github.com/eqinox76/RiseAndFallOfEmpires/util"
 	"github.com/golang/protobuf/proto"
 	"math/rand"
 	"time"
@@ -10,12 +11,31 @@ import (
 
 	"encoding/binary"
 	"sort"
+	"fmt"
 )
 
 type Space struct {
 	pb.Space
 	PlanetTree *rtreego.Rtree
 	Graph      Graph
+}
+
+func (space *Space) RemoveShip(ship *pb.Ship) {
+	// remove from global ships
+	space.Ships[ship.Id] = nil
+
+	// remove from planet
+	switch x := ship.GetPosition().(type) {
+	case *pb.Ship_Orbiting:
+		planet := space.Planets[x.Orbiting]
+		util.RemoveUint64(&planet.Orbiting, ship.Id)
+	default:
+		panic(fmt.Sprintf("A destroyed ship is not orbiting a planet! %T", x))
+	}
+
+	// remove from empire
+	empire := space.Empires[ship.Empire]
+	util.RemoveUint64(&empire.Ships, ship.Id)
 }
 
 type PlanetPos struct {
@@ -26,7 +46,7 @@ func (p PlanetPos) Bounds() *rtreego.Rect {
 	return rtreego.Point{float64(p.PosX), float64(p.PosY)}.ToRect(0)
 }
 
-func NewSpace() Space {
+func EmptySpace() Space {
 	rand.Seed(time.Now().UTC().UnixNano())
 	space := Space{
 		Space: pb.Space{
@@ -36,9 +56,15 @@ func NewSpace() Space {
 		PlanetTree: rtreego.NewTree(2, 32, 64),
 	}
 
+	return space
+}
+
+func NewSpace() Space {
+	space := EmptySpace()
+
 	// add planets
 	for i := uint32(0); i < 25; i++ {
-		CreateNewPlanet(&space)
+		space.CreateNewPlanet()
 	}
 
 	space.Graph = NewGraph(space.Planets)
@@ -102,7 +128,8 @@ func NewSpace() Space {
 	return space
 }
 
-func CreateShip(space *Space, planet *pb.Planet) *pb.Ship {
+func (space *Space) CreateShip(planet *pb.Planet, empire *pb.Empire) *pb.Ship {
+	// TODO this creates a id from the last ship. but we may have already destroyed ships and therefore other open ids
 	var id uint64 = 0
 	if space.Ships != nil {
 		id = space.Ships[len(space.Ships)-1].Id
@@ -111,18 +138,39 @@ func CreateShip(space *Space, planet *pb.Planet) *pb.Ship {
 
 	s := pb.Ship{
 		Id: id,
+		Empire: empire.Id,
+		Position: &pb.Ship_Orbiting{
+			Orbiting: planet.Id,
+		},
 	}
 
 	space.Ships = append(space.Ships, &s)
 	planet.Orbiting = append(planet.Orbiting, s.Id)
+	empire.Ships = append(empire.Ships, s.Id)
 	return &s
+}
+
+func (space *Space) CreateEmpire(color string) *pb.Empire{
+	var id uint32 = 0
+	if space.Empires != nil {
+		id = space.Empires[len(space.Empires)-1].Id
+		id++
+	}
+
+	e := pb.Empire{
+		Id: id,
+		Color: color,
+	}
+
+	space.Empires = append(space.Empires, &e)
+	return &e
 }
 
 func asVec(planet *pb.Planet) v.Vec {
 	return v.Vec{float64(planet.PosX), float64(planet.PosY)}
 }
 
-func CreateNewPlanet(space *Space) *pb.Planet {
+func (space *Space) CreateNewPlanet() *pb.Planet {
 	var id uint32 = 0
 	if space.Planets != nil {
 		id = space.Planets[len(space.Planets)-1].Id
@@ -130,7 +178,7 @@ func CreateNewPlanet(space *Space) *pb.Planet {
 	}
 
 	var x, y uint32
-	for true {
+	for {
 		x, y = rand.Uint32()%space.Width, rand.Uint32()%space.Height
 		valid := true
 		if x < 50 || x > space.Width-50 {

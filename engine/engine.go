@@ -2,44 +2,95 @@ package engine
 
 import (
 	"github.com/eqinox76/RiseAndFallOfEmpires/state"
+	"github.com/eqinox76/RiseAndFallOfEmpires/util"
 	"math/rand"
 	"math"
+	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
 )
 
 func Step(space *state.Space) {
 	for _, planet := range space.Planets {
+		if space.Empires[planet.Empire].Passive{
+			// this empire produces nothing
+			continue
+		}
+
 		if rand.Float32() <= planet.Control {
-			state.CreateShip(space, planet)
+			space.CreateShip(planet, space.Empires[planet.Empire])
 		}
-		if planet.Control != 1 {
-			if planet.Control > 0.999 {
-				planet.Control = 1
-			} else if planet.Control > 0.5 {
-				planet.Control = planet.Control + (rand.Float32() * 0.1 * (1 - planet.Control))
-			} else {
-				planet.Control = planet.Control + (rand.Float32() * 0.1 * (planet.Control))
-			}
-		}
+
+		computeControl(planet)
+
+		computeFight(space, planet)
 	}
 	return
 }
 
-func Fight(shipsA uint32, shipsB uint32) (uint32, uint32) {
-	a := shipsA - destroyed(shipsB, shipsA)
-	b := shipsB - destroyed(shipsA, shipsB)
-	return a, b
+func getFleets(global_ships []*pb.Ship, planet *pb.Planet) map[uint32][]*pb.Ship{
+	fleets := make(map[uint32][]*pb.Ship)
+
+	for _, id := range planet.Orbiting {
+		s := global_ships[id]
+		_, ok := fleets[s.Empire]
+		if !ok {
+			fleets[s.Empire] = []*pb.Ship{}
+		}
+
+		fleets[s.Empire] = append(fleets[s.Empire], s)
+	}
+
+	return fleets
 }
 
-func destroyed(ships uint32, target uint32) uint32 {
-	const prob float64 = 0.1
+func computeFight(space *state.Space, planet *pb.Planet) {
+	fleets := getFleets(space.Ships, planet)
+
+	if len(fleets) < 2 {
+		// at most one empire present
+		return
+	}
+
+	// fight all combinations
+	for target, t_fleet := range fleets {
+		lost := 0
+		for attacker, a_fleet := range fleets {
+			if target == attacker {
+				continue
+			}
+			// let <ships>/<enemies> fight against that fleet
+			lost += computeDamage(len(a_fleet) / len(fleets), len(t_fleet))
+		}
+
+		lost = util.MinInt(lost, len(t_fleet))
+		for lost > 0 {
+			space.RemoveShip(t_fleet[lost - 1])
+			lost--
+		}
+	}
+}
+
+func computeControl(planet *pb.Planet) {
+	if planet.Control != 1 {
+		if planet.Control > 0.999 {
+			planet.Control = 1
+		} else if planet.Control > 0.5 {
+			planet.Control = planet.Control + (rand.Float32() * 0.1 * (1 - planet.Control))
+		} else {
+			planet.Control = planet.Control + (rand.Float32() * 0.1 * (planet.Control))
+		}
+	}
+}
+
+func computeDamage(ships int, target int) int {
+	const prob float64 = 0.05
 	var deviation float64 = math.Sqrt(float64(ships) * prob * (1 - prob))
 	var destroyed float64 = rand.NormFloat64()*deviation + (float64(ships) * prob)
 
 	if destroyed < 0 {
 		return 0
-	} else if target < uint32(destroyed) {
+	} else if target < int(destroyed) {
 		return target
 	} else {
-		return uint32(destroyed)
+		return int(destroyed)
 	}
 }
