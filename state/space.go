@@ -291,7 +291,7 @@ func NewSpace(empires int) Space {
 	// add neutral fleets
 	for _, planet := range space.Planets{
 		if planet.Empire == 0{
-			ships := rand.Intn(10)
+			ships := 2 + rand.Intn(8)
 			for ; ships > 0; ships--{
 				space.CreateShip(planet, space.Empires[0])
 			}
