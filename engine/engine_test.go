@@ -14,7 +14,7 @@ func TestFightsEnd(t *testing.T) {
 
 	space := state.EmptySpace()
 
-	p := space.CreateNewPlanet()
+	p := space.CreateNewPlanet(space.CreateEmpire("doesntmatter"))
 
 	for e_id := 0; e_id < 3; e_id++ {
 		e := space.CreateEmpire("none")

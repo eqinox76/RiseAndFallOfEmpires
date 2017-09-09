@@ -6,18 +6,19 @@ import (
 	"github.com/eqinox76/RiseAndFallOfEmpires/util"
 	"github.com/golang/protobuf/proto"
 	"math/rand"
-	"time"
 	"github.com/dhconnelly/rtreego"
 
 	"encoding/binary"
 	"sort"
 	"fmt"
+	"math"
 )
 
 type Space struct {
 	pb.Space
 	PlanetTree *rtreego.Rtree
 	Graph      Graph
+	freeColors []string
 }
 
 func (space *Space) RemoveShip(ship *pb.Ship) {
@@ -47,32 +48,193 @@ func (p PlanetPos) Bounds() *rtreego.Rect {
 }
 
 func EmptySpace() Space {
-	rand.Seed(time.Now().UTC().UnixNano())
 	space := Space{
 		Space: pb.Space{
-			Width:  1000,
-			Height: 500,
+			Width:  1400,
+			Height: 800,
 		},
 		PlanetTree: rtreego.NewTree(2, 32, 64),
 	}
 
+	space.freeColors = []string{
+		"aliceblue",
+		"antiquewhite",
+		"aqua",
+		"aquamarine",
+		"azure",
+		"beige",
+		"bisque",
+		"black",
+		"blanchedalmond",
+		"blue",
+		"blueviolet",
+		"brown",
+		"burlywood",
+		"cadetblue",
+		"chartreuse",
+		"chocolate",
+		"coral",
+		"cornflowerblue",
+		"cornsilk",
+		"crimson",
+		"cyan",
+		"darkblue",
+		"darkcyan",
+		"darkgoldenrod",
+		"darkgray",
+		"darkgreen",
+		"darkgrey",
+		"darkkhaki",
+		"darkmagenta",
+		"darkolivegreen",
+		"darkorange",
+		"darkorchid",
+		"darkred",
+		"darksalmon",
+		"darkseagreen",
+		"darkslateblue",
+		"darkslategray",
+		"darkslategrey",
+		"darkturquoise",
+		"darkviolet",
+		"deeppink",
+		"deepskyblue",
+		"dimgray",
+		"dimgrey",
+		"dodgerblue",
+		"firebrick",
+		"floralwhite",
+		"forestgreen",
+		"fuchsia",
+		"gainsboro",
+		"ghostwhite",
+		"gold",
+		"goldenrod",
+		"green",
+		"greenyellow",
+		"grey",
+		"honeydew",
+		"hotpink",
+		"indianred",
+		"indigo",
+		"ivory",
+		"khaki",
+		"lavender",
+		"lavenderblush",
+		"lawngreen",
+		"lemonchiffon",
+		"lightblue",
+		"lightcoral",
+		"lightcyan",
+		"lightgoldenrodyellow",
+		"lightgray",
+		"lightgreen",
+		"lightgrey",
+		"lightpink",
+		"lightsalmon",
+		"lightseagreen",
+		"lightskyblue",
+		"lightslategray(Hex3)",
+		"lightslategrey(Hex3)",
+		"lightsteelblue",
+		"lightyellow",
+		"lime",
+		"limegreen",
+		"linen",
+		"magenta",
+		"maroon",
+		"mediumaquamarine",
+		"mediumblue",
+		"mediumorchid",
+		"mediumpurple",
+		"mediumseagreen",
+		"mediumslateblue",
+		"mediumspringgreen",		
+		"mediumturquoise",
+		"mediumvioletred",
+		"midnightblue",
+		"mintcream",		
+		"mistyrose",
+		"moccasin",
+		"navajowhite",
+		"navy",
+		"oldlace",
+		"olive",
+		"olivedrab",
+		"orange",
+		"orangered",
+		"orchid",
+		"palegoldenrod",
+		"palegreen",
+		"paleturquoise",
+		"palevioletred",
+		"papayawhip",
+		"peachpuff",
+		"peru",
+		"pink",
+		"plum",
+		"powderblue",
+		"purple",
+		"red",
+		"rosybrown",
+		"royalblue",
+		"saddlebrown",
+		"salmon",
+		"sandybrown",
+		"seagreen",
+		"seashell",
+		"sienna",
+		"silver",
+		"skyblue",
+		"slateblue",
+		"slategray",
+		"slategrey",
+		"snow",
+		"springgreen",
+		"steelblue",
+		"tan",
+		"teal",
+		"thistle",
+		"tomato",
+		"turquoise",
+		"violet",
+		"wheat",
+		"white",
+		"whitesmoke",
+		"yellow",
+		"yellowgreen}"}
+	
+
 	return space
 }
 
-func NewSpace() Space {
+func NewSpace(empires int) Space {
 	space := EmptySpace()
 
+	neutralEmpire := space.CreateEmpire()
+	space.freeColors = append(space.freeColors,neutralEmpire.Color)
+	neutralEmpire.Color = "grey"
+	neutralEmpire.Passive = true
+
 	// add planets
-	for i := uint32(0); i < 25; i++ {
-		space.CreateNewPlanet()
+	for i := uint32(0); i < 100; i++ {
+		space.CreateNewPlanet(neutralEmpire)
+	}
+
+	// add empire start planets
+	for ; empires > 0; empires-- {
+		e := space.CreateEmpire()
+		p := space.Planets[rand.Intn(len(space.Planets))]
+		p.Empire = e.Id
+		e.Planets = append(e.Planets, p.Id)
 	}
 
 	space.Graph = NewGraph(space.Planets)
-	// add the shortes paths until we have all nodes connected and do not add edges which add a cycle
+	// add the shortest paths until we have all nodes connected and do not add edges which add a cycle
 	var edges Edges
-	for _, planet := range space.Planets{
-		for _, to := range space.Planets{
-			if planet.Id >= to.Id{
+	for _, planet := range space.Planets {
+		for _, to := range space.Planets {
+			if planet.Id >= to.Id {
 				continue
 			}
 			edges = append(edges, edge{planet.Id, to.Id, asVec(planet).Dist(asVec(to))})
@@ -86,8 +248,8 @@ func NewSpace() Space {
 	// this is done by adding all edged for a minimal spanning tree based on distance
 	// thereafter some planets are randomly connected with their n-nrearest neighbors but with decreasing likelyhood
 	root := space.Planets[0]
-	for _, edge := range edges{
-		if space.Graph.GraphSize(root) == len(space.Planets){
+	for _, edge := range edges {
+		if space.Graph.GraphSize(root) == len(space.Planets) {
 			// done
 			break;
 		}
@@ -99,16 +261,17 @@ func NewSpace() Space {
 		to.Connected = append(to.Connected, from.Id)
 
 		// check if cycling
-		if space.Graph.HasCycle(from){
-			from.Connected = from.Connected[: len(from.Connected) - 1]
-			to.Connected = to.Connected[: len(to.Connected) - 1]
+		if space.Graph.HasCycle(from) {
+			from.Connected = from.Connected[: len(from.Connected)-1]
+			to.Connected = to.Connected[: len(to.Connected)-1]
 		}
 	}
 
-	for size := 1; size < 3; size++ {
+	max_connections := int(math.Pow(float64(len(space.Planets)), 1.))
+	for size := 1; size < max_connections; size++ {
 		for _, planet := range space.Planets {
 			if len(planet.Connected) == size {
-				if rand.Intn(4) <= size{
+				if rand.Intn(4) <= size {
 					continue
 				}
 
@@ -125,6 +288,16 @@ func NewSpace() Space {
 		}
 	}
 
+	// add neutral fleets
+	for _, planet := range space.Planets{
+		if planet.Empire == 0{
+			ships := rand.Intn(10)
+			for ; ships > 0; ships--{
+				space.CreateShip(planet, space.Empires[0])
+			}
+		}
+	}
+
 	return space
 }
 
@@ -137,7 +310,7 @@ func (space *Space) CreateShip(planet *pb.Planet, empire *pb.Empire) *pb.Ship {
 	}
 
 	s := pb.Ship{
-		Id: id,
+		Id:     id,
 		Empire: empire.Id,
 		Position: &pb.Ship_Orbiting{
 			Orbiting: planet.Id,
@@ -150,15 +323,20 @@ func (space *Space) CreateShip(planet *pb.Planet, empire *pb.Empire) *pb.Ship {
 	return &s
 }
 
-func (space *Space) CreateEmpire(color string) *pb.Empire{
+func (space *Space) CreateEmpire() *pb.Empire {
 	var id uint32 = 0
 	if space.Empires != nil {
 		id = space.Empires[len(space.Empires)-1].Id
 		id++
 	}
 
+	c := rand.Intn(len(space.freeColors))
+	color := space.freeColors[c]
+	space.freeColors[c] = space.freeColors[len(space.freeColors)-1]
+	space.freeColors = space.freeColors[: len(space.freeColors)-1]
+
 	e := pb.Empire{
-		Id: id,
+		Id:    id,
 		Color: color,
 	}
 
@@ -170,7 +348,7 @@ func asVec(planet *pb.Planet) v.Vec {
 	return v.Vec{float64(planet.PosX), float64(planet.PosY)}
 }
 
-func (space *Space) CreateNewPlanet() *pb.Planet {
+func (space *Space) CreateNewPlanet(empire *pb.Empire) *pb.Planet {
 	var id uint32 = 0
 	if space.Planets != nil {
 		id = space.Planets[len(space.Planets)-1].Id
@@ -208,6 +386,7 @@ func (space *Space) CreateNewPlanet() *pb.Planet {
 		PosX:    x,
 		PosY:    y,
 		Control: rand.Float32(),
+		Empire:  empire.Id,
 	}
 
 	space.Planets = append(space.Planets, &planet)

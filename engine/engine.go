@@ -10,13 +10,18 @@ import (
 
 func Step(space *state.Space) {
 	for _, planet := range space.Planets {
-		if space.Empires[planet.Empire].Passive{
+		if space.Empires[planet.Empire].Passive {
 			// this empire produces nothing
 			continue
 		}
 
 		if rand.Float32() <= planet.Control {
-			space.CreateShip(planet, space.Empires[planet.Empire])
+			// check if the empire can have a new ship
+			e := space.Empires[planet.Empire]
+
+			if (len(e.Planets) * 100) > len(e.Ships) {
+				space.CreateShip(planet, e)
+			}
 		}
 
 		computeControl(planet)
@@ -26,7 +31,7 @@ func Step(space *state.Space) {
 	return
 }
 
-func getFleets(global_ships []*pb.Ship, planet *pb.Planet) map[uint32][]*pb.Ship{
+func getFleets(global_ships []*pb.Ship, planet *pb.Planet) map[uint32][]*pb.Ship {
 	fleets := make(map[uint32][]*pb.Ship)
 
 	for _, id := range planet.Orbiting {
@@ -58,12 +63,12 @@ func computeFight(space *state.Space, planet *pb.Planet) {
 				continue
 			}
 			// let <ships>/<enemies> fight against that fleet
-			lost += computeDamage(len(a_fleet) / len(fleets), len(t_fleet))
+			lost += computeDamage(len(a_fleet)/len(fleets), len(t_fleet))
 		}
 
 		lost = util.MinInt(lost, len(t_fleet))
 		for lost > 0 {
-			space.RemoveShip(t_fleet[lost - 1])
+			space.RemoveShip(t_fleet[lost-1])
 			lost--
 		}
 	}

@@ -8,6 +8,7 @@ import (
 	"os"
 	"sync"
 	"time"
+	"math/rand"
 )
 
 type Worker struct {
@@ -17,7 +18,9 @@ type Worker struct {
 
 func main() {
 
-	space := state.NewSpace()
+	rand.Seed(time.Now().UTC().UnixNano())
+
+	space := state.NewSpace(13)
 	fanOut := make(chan []byte)
 	defer close(fanOut)
 
@@ -57,7 +60,7 @@ func main() {
 		for msg := range fanOut {
 			mutex.Lock()
 			for i, w := range workers {
-				fmt.Print(w)
+				fmt.Println(w)
 				if w.Done {
 					// this worker is done so remove it
 
@@ -77,7 +80,7 @@ func main() {
 		bytes, _ := state.Serialize(&space)
 		fmt.Printf("serialize: %d, Planets: %d Ships: %d\n", len(bytes), len(space.Planets), len(space.Ships))
 		engine.Step(&space)
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(1000 * time.Millisecond)
 		fanOut <- bytes
 	}
 

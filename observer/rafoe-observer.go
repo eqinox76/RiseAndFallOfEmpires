@@ -88,20 +88,26 @@ func render(writer *bufio.Writer, space *pb.Space) {
 	canvas := svg.New(writer)
 	canvas.Start(width, height)
 	for _, planet := range space.Planets{
-		// render planet
-		canvas.Circle(int(planet.PosX), int(planet.PosY), 10, "fill: none; stroke: black; stroke-width: 1")
-		canvas.Circle(int(planet.PosX), int(planet.PosY), 10, fmt.Sprintf("fill-opacity: %f", planet.Control))
-		// show id
-		canvas.Text(int(planet.PosX), int(planet.PosY) - 20, fmt.Sprint("Id:", planet.Id), "text-anchor:middle;font-size:10px;fill:green")
-		// show control
-		canvas.Text(int(planet.PosX), int(planet.PosY) + 20, fmt.Sprint("Control:", planet.Control), "text-anchor:middle;font-size:10px;fill:green")
-		// show ships
-		canvas.Text(int(planet.PosX), int(planet.PosY) - 10, fmt.Sprint("#Ships:", len(planet.Orbiting)), "text-anchor:middle;font-size:10px;fill:green")
-
 		// render connection
 		for _, id := range planet.Connected {
 			canvas.Line(int(planet.PosX), int(planet.PosY), int(space.Planets[id].PosX), int(space.Planets[id].PosY), "stroke:blue; stroke-width:2; stroke-opacity: 0.2")
 		}
+
+		// render planet
+		color := space.Empires[planet.Empire].Color
+		canvas.Circle(int(planet.PosX), int(planet.PosY), 10, fmt.Sprintf("fill: none; stroke: black; stroke-width: 1"))
+		canvas.Circle(int(planet.PosX), int(planet.PosY), 10, fmt.Sprintf("fill-opacity: %f; fill: %s", planet.Control, color))
+		if (planet.Empire != 0) {
+			// show id
+			canvas.Text(int(planet.PosX), int(planet.PosY)-20, fmt.Sprint("Id:", planet.Id), "text-anchor:middle;font-size:10px;fill:green")
+			// show control
+			canvas.Text(int(planet.PosX), int(planet.PosY)+20, fmt.Sprint("Control:", planet.Control), "text-anchor:middle;font-size:10px;fill:green")
+		}
+		if len(planet.Orbiting) > 0 {
+			// show ships
+			canvas.Text(int(planet.PosX), int(planet.PosY)-10, fmt.Sprint("#Ships:", len(planet.Orbiting)), "text-anchor:middle;font-size:10px;fill:green")
+		}
+
 	}
 
 	canvas.End()
