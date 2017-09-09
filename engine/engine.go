@@ -27,8 +27,32 @@ func Step(space *state.Space) {
 		computeControl(planet)
 
 		computeFight(space, planet)
+
+		computeOwner(space, planet)
 	}
 	return
+}
+func computeOwner(space *state.Space, planet *pb.Planet) {
+	fleets := getFleets(space.Ships, planet)
+	_ , fleet_exists := fleets[planet.Empire]
+	if fleet_exists{
+		// this planet has a defending fleet
+		return
+	}
+
+	if len(fleets) > 1{
+		// this planet is still being fought over
+		return
+	}
+
+	for id := range fleets {
+		old_owner := space.Empires[planet.Id]
+		util.RemoveUint32(&old_owner.Planets, planet.Id)
+		new_owner := space.Empires[id]
+		new_owner.Planets = append(new_owner.Planets, planet.Id)
+		planet.Empire = id
+		planet.Control = 0.
+	}
 }
 
 func getFleets(global_ships []*pb.Ship, planet *pb.Planet) map[uint32][]*pb.Ship {
