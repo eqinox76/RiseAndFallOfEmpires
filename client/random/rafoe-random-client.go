@@ -10,7 +10,6 @@ import (
 )
 
 var wg sync.WaitGroup
-var mutex sync.Mutex
 
 func main() {
 	wg.Add(1)

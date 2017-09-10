@@ -75,21 +75,27 @@ func render(writer *bufio.Writer, space *pb.Space) {
 		canvas.Circle(int(planet.PosX), int(planet.PosY), 10, fmt.Sprintf("fill-opacity: %f; fill: %s", planet.Control, color))
 		if planet.Empire != 0 {
 			// show control
-			canvas.Text(int(planet.PosX), int(planet.PosY)+20, fmt.Sprint("Control:", planet.Control), "text-anchor:middle;font-size:10px;fill:green")
+			// canvas.Text(int(planet.PosX), int(planet.PosY)+20, fmt.Sprint("Control:", planet.Control), "text-anchor:middle;font-size:10px;fill:green")
 			// show ships
-			canvas.Text(int(planet.PosX), int(planet.PosY)-10, fmt.Sprint("#Ships:", len(planet.Orbiting)), "text-anchor:middle;font-size:10px;fill:green")
+			canvas.Text(int(planet.PosX), int(planet.PosY)-15, fmt.Sprint(len(planet.Orbiting)), "text-anchor:middle;font-size:12px;fill:" + color)
 		}
 
 		fleets := state.GetFleets(space.Ships, planet)
 		if len(fleets) > 1{
 			var text string
 			for key, value := range fleets {
-				text += fmt.Sprint(key, len(value), "|")
+				text += fmt.Sprintf("%s: %d,", space.Empires[key].Color, len(value))
 			}
 			canvas.Text(int(planet.PosX), int(planet.PosY)-20, text, "text-anchor:middle;font-size:10px;fill:green")
 		}
 
+		// show at most 50 ships
+		counter := 0
 		for ship, _ := range planet.Orbiting{
+			if counter > 50{
+				break
+			}
+			counter++
 			degree := 2 * math.Pi * rand.Float64()
 			canvas.Circle(int(float64(planet.PosX) + (14 * math.Sin(degree))),
 				int(float64(planet.PosY) + (14 * math.Cos(degree))),
