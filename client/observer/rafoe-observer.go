@@ -116,7 +116,7 @@ func menuViewer(writer http.ResponseWriter, request *http.Request) {
 
 <body>
 
-<canvas id="space" />
+<div id="space" />
 
 <script type="text/JavaScript">
 
@@ -126,13 +126,15 @@ canvas.height = window.innerHeight;
 
 function update() {
 
-	var c = document.getElementById("space");
-	var ctx = c.getContext("2d");
-	var img = new Image();
+	var space = document.getElementById("space");
+	var img = document.createElement('img');
 	img.src = 'space.svg'
 	img.onload = function(){
-		ctx.clearRect(0, 0, c.width, c.height);
-		ctx.drawImage(img, 0, 0);
+		while (space.firstChild) {
+			space.removeChild(space.firstChild);
+		}
+
+		space.insertBefore(img, null);
 	}
 
 	// keep going
