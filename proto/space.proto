@@ -4,9 +4,9 @@ package riseandfall;
 
 
 message Space{
-	repeated Planet planets = 1;
-	repeated Ship ships = 2;
-	repeated Empire empires = 3;
+	map<uint32, Planet> planets = 1;
+	map<uint64, Ship> ships = 2;
+	map<uint32, Empire> empires = 3;
     uint32 width = 4;
     uint32 height = 5;
 }
@@ -16,7 +16,7 @@ message Planet{
 	uint32 id = 2;
 	uint32 pos_x = 3;
 	uint32 pos_y = 4;
-	repeated uint64 orbiting = 5;
+	map<uint64, bool> orbiting = 5;
 	float control = 6;
 	uint32 empire = 7;
     repeated uint32 connected = 8;
@@ -41,7 +41,7 @@ message Movement{
 message Empire{
 	uint32 id = 1;
 	bool passive = 2;
-	repeated uint64 ships = 3;
-	repeated uint32 planets = 4;
+	map<uint64, bool> ships = 3;
+	map<uint32, bool> planets = 4;
 	string color = 5;
 }

@@ -3,15 +3,14 @@ package state
 import (
 	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
 	v "github.com/eqinox76/RiseAndFallOfEmpires/vector"
-	"github.com/eqinox76/RiseAndFallOfEmpires/util"
 	"github.com/golang/protobuf/proto"
 	"math/rand"
 	"github.com/dhconnelly/rtreego"
 
 	"encoding/binary"
 	"sort"
-	"fmt"
 	"math"
+	"fmt"
 )
 
 type Space struct {
@@ -21,22 +20,33 @@ type Space struct {
 	freeColors []string
 }
 
+// for now lets just teleport ships
+func (space *Space) MoveShip(ship uint64, start uint32, destination uint32) {
+	space.Ships[ship].Position = &pb.Ship_Orbiting{
+		Orbiting: destination,
+	}
+
+	delete(space.Planets[start].Orbiting, ship)
+	space.Planets[destination].Orbiting[ship] = true
+}
+
 func (space *Space) RemoveShip(ship *pb.Ship) {
 	// remove from global ships
-	space.Ships[ship.Id] = nil
+	delete(space.Ships, ship.Id)
 
 	// remove from planet
 	switch x := ship.GetPosition().(type) {
 	case *pb.Ship_Orbiting:
 		planet := space.Planets[x.Orbiting]
-		util.RemoveUint64(&planet.Orbiting, ship.Id)
+
+		delete(planet.Orbiting, ship.Id)
 	default:
 		panic(fmt.Sprintf("A destroyed ship is not orbiting a planet! %T", x))
 	}
 
 	// remove from empire
 	empire := space.Empires[ship.Empire]
-	util.RemoveUint64(&empire.Ships, ship.Id)
+	delete(empire.Ships, ship.Id)
 }
 
 type PlanetPos struct {
@@ -52,6 +62,9 @@ func EmptySpace() Space {
 		Space: pb.Space{
 			Width:  1400,
 			Height: 800,
+			Ships: make(map[uint64]*pb.Ship),
+			Planets: make(map[uint32]*pb.Planet),
+			Empires: make(map[uint32]*pb.Empire),
 		},
 		PlanetTree: rtreego.NewTree(2, 32, 64),
 	}
@@ -149,11 +162,11 @@ func EmptySpace() Space {
 		"mediumpurple",
 		"mediumseagreen",
 		"mediumslateblue",
-		"mediumspringgreen",		
+		"mediumspringgreen",
 		"mediumturquoise",
 		"mediumvioletred",
 		"midnightblue",
-		"mintcream",		
+		"mintcream",
 		"mistyrose",
 		"moccasin",
 		"navajowhite",
@@ -203,7 +216,6 @@ func EmptySpace() Space {
 		"whitesmoke",
 		"yellow",
 		"yellowgreen}"}
-	
 
 	return space
 }
@@ -212,21 +224,22 @@ func NewSpace(empires int) Space {
 	space := EmptySpace()
 
 	neutralEmpire := space.CreateEmpire()
-	space.freeColors = append(space.freeColors,neutralEmpire.Color)
+	space.freeColors = append(space.freeColors, neutralEmpire.Color)
 	neutralEmpire.Color = "grey"
 	neutralEmpire.Passive = true
 
 	// add planets
 	for i := uint32(0); i < 100; i++ {
-		space.CreateNewPlanet(neutralEmpire)
+		space.CreatePlanet(neutralEmpire)
 	}
 
 	// add empire start planets
 	for ; empires > 0; empires-- {
 		e := space.CreateEmpire()
-		p := space.Planets[rand.Intn(len(space.Planets))]
+		p := space.Planets[uint32(rand.Int() % (len(space.Planets)))]
 		p.Empire = e.Id
-		e.Planets = append(e.Planets, p.Id)
+		e.Planets[p.Id] = true
+		p.Control = 0.5
 	}
 
 	space.Graph = NewGraph(space.Planets)
@@ -267,32 +280,30 @@ func NewSpace(empires int) Space {
 		}
 	}
 
-	max_connections := int(math.Pow(float64(len(space.Planets)), 1.))
+	max_connections := int(math.Pow(float64(len(space.Planets)), 1./4.))
 	for size := 1; size < max_connections; size++ {
 		for _, planet := range space.Planets {
-			if len(planet.Connected) == size {
-				if rand.Intn(4) <= size {
-					continue
-				}
-
-				nn := space.PlanetTree.NearestNeighbors(size+2, rtreego.Point{float64(planet.PosX), float64(planet.PosY)})
-
-				to, ok := nn[size+1].(*PlanetPos)
-				if ! ok {
-					panic(nn[size+1])
-				}
-
-				planet.Connected = append(planet.Connected, to.Id)
-				to.Connected = append(to.Connected, planet.Id)
+			if rand.Intn(max_connections) < size {
+				continue
 			}
+
+			nn := space.PlanetTree.NearestNeighbors(size+2, rtreego.Point{float64(planet.PosX), float64(planet.PosY)})
+
+			to, ok := nn[size+1].(*PlanetPos)
+			if ! ok {
+				panic(nn[size+1])
+			}
+
+			planet.Connected = append(planet.Connected, to.Id)
+			to.Connected = append(to.Connected, planet.Id)
 		}
 	}
 
 	// add neutral fleets
-	for _, planet := range space.Planets{
-		if planet.Empire == 0{
+	for _, planet := range space.Planets {
+		if planet.Empire == 0 {
 			ships := 2 + rand.Intn(8)
-			for ; ships > 0; ships--{
+			for ; ships > 0; ships-- {
 				space.CreateShip(planet, space.Empires[0])
 			}
 		}
@@ -302,11 +313,11 @@ func NewSpace(empires int) Space {
 }
 
 func (space *Space) CreateShip(planet *pb.Planet, empire *pb.Empire) *pb.Ship {
-	// TODO this creates a id from the last ship. but we may have already destroyed ships and therefore other open ids
-	var id uint64 = 0
-	if space.Ships != nil {
-		id = space.Ships[len(space.Ships)-1].Id
+	id := uint64(len(space.Ships))
+	_, contained := space.Ships[id]
+	for contained {
 		id++
+		_, contained = space.Ships[id]
 	}
 
 	s := pb.Ship{
@@ -317,17 +328,17 @@ func (space *Space) CreateShip(planet *pb.Planet, empire *pb.Empire) *pb.Ship {
 		},
 	}
 
-	space.Ships = append(space.Ships, &s)
-	planet.Orbiting = append(planet.Orbiting, s.Id)
-	empire.Ships = append(empire.Ships, s.Id)
+	space.Ships[id] = &s
+	planet.Orbiting[s.Id] =true
+	empire.Ships[s.Id] =true
 	return &s
 }
 
 func (space *Space) CreateEmpire() *pb.Empire {
-	var id uint32 = 0
-	if space.Empires != nil {
-		id = space.Empires[len(space.Empires)-1].Id
-		id++
+	id := uint32(len(space.Empires))
+	_, contained := space.Empires[id]
+	for ; contained; id++ {
+		_, contained = space.Empires[id]
 	}
 
 	c := rand.Intn(len(space.freeColors))
@@ -338,9 +349,11 @@ func (space *Space) CreateEmpire() *pb.Empire {
 	e := pb.Empire{
 		Id:    id,
 		Color: color,
+		Ships: make(map[uint64] bool),
+		Planets: make(map[uint32] bool),
 	}
 
-	space.Empires = append(space.Empires, &e)
+	space.Empires[e.Id] = &e
 	return &e
 }
 
@@ -348,11 +361,11 @@ func asVec(planet *pb.Planet) v.Vec {
 	return v.Vec{float64(planet.PosX), float64(planet.PosY)}
 }
 
-func (space *Space) CreateNewPlanet(empire *pb.Empire) *pb.Planet {
-	var id uint32 = 0
-	if space.Planets != nil {
-		id = space.Planets[len(space.Planets)-1].Id
-		id++
+func (space *Space) CreatePlanet(empire *pb.Empire) *pb.Planet {
+	id := uint32(len(space.Planets))
+	_, contained := space.Planets[id]
+	for ; contained; id++ {
+		_, contained = space.Planets[id]
 	}
 
 	var x, y uint32
@@ -387,12 +400,30 @@ func (space *Space) CreateNewPlanet(empire *pb.Empire) *pb.Planet {
 		PosY:    y,
 		Control: rand.Float32(),
 		Empire:  empire.Id,
+		Orbiting: make(map[uint64] bool),
 	}
 
-	space.Planets = append(space.Planets, &planet)
-
+	empire.Planets[planet.Id] = true
+	space.Planets[planet.Id] = &planet
 	space.PlanetTree.Insert(&PlanetPos{&planet})
+
 	return &planet
+}
+
+func GetFleets(global_ships map[uint64]*pb.Ship, planet *pb.Planet) map[uint32][]*pb.Ship {
+	fleets := make(map[uint32][]*pb.Ship)
+
+	for id, _ := range planet.Orbiting {
+		s := global_ships[id]
+		_, ok := fleets[s.Empire]
+		if !ok {
+			fleets[s.Empire] = []*pb.Ship{}
+		}
+
+		fleets[s.Empire] = append(fleets[s.Empire], s)
+	}
+
+	return fleets
 }
 
 func Serialize(space *Space) ([]byte, error) {

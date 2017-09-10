@@ -1,1 +1,2 @@
-protoc --go_out=. proto/space.proto
+protoc --go_out=. proto/*.proto
+

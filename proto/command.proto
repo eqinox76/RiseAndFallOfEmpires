@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package riseandfall;
+
+message Command{
+    uint32 empire = 1;
+    repeated Order orders = 2;
+
+    message Order{
+       oneof order{
+           MovementOrder move = 3;
+       }
+    };
+}
+
+message MovementOrder{
+    uint64 ship = 1;
+    uint32 start = 2;
+    uint32 destination = 3;
+}
+

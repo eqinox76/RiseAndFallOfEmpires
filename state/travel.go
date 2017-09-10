@@ -28,7 +28,7 @@ func (a Edges) Less(i, j int) bool {
 
 var  generation uint32 = 0
 
-func NewGraph(planets []*pb.Planet) Graph {
+func NewGraph(planets map[uint32]*pb.Planet) Graph {
 	elems := make([]node, len(planets))
 	for i, planet := range planets {
 		elems[i].planet = planet

@@ -10,69 +10,68 @@ import (
 
 func Step(space *state.Space) {
 	for _, planet := range space.Planets {
-		if space.Empires[planet.Empire].Passive {
-			// this empire produces nothing
-			continue
-		}
 
-		if rand.Float32() <= planet.Control {
-			// check if the empire can have a new ship
-			e := space.Empires[planet.Empire]
-
-			if (len(e.Planets) * 100) > len(e.Ships) {
-				space.CreateShip(planet, e)
-			}
-		}
-
+		computeProduction(space, planet)
 		computeControl(planet)
-
 		computeFight(space, planet)
-
 		computeOwner(space, planet)
 	}
 	return
 }
+func computeProduction(space *state.Space, planet *pb.Planet) {
+	if space.Empires[planet.Empire].Passive {
+		// this empire produces nothing
+		return
+	}
+
+	if rand.Float32() <= planet.Control {
+		// check if the empire can have a new ship
+		e := space.Empires[planet.Empire]
+
+		if (len(e.Planets) * 100) > len(e.Ships) {
+			space.CreateShip(planet, e)
+		}
+	}
+}
+
+func ProcessCommand(space *state.Space, command *pb.Command) {
+	for _, cmd := range command.Orders {
+		switch order := cmd.Order.(type) {
+		case *pb.Command_Order_Move:
+			//validate input
+			_, valid := space.Planets[order.Move.Start].Orbiting[order.Move.Ship]
+			if valid {
+				space.MoveShip(order.Move.Ship, order.Move.Start, order.Move.Destination)
+			}
+		}
+	}
+}
+
 func computeOwner(space *state.Space, planet *pb.Planet) {
-	fleets := getFleets(space.Ships, planet)
-	_ , fleet_exists := fleets[planet.Empire]
-	if fleet_exists{
+	fleets := state.GetFleets(space.Ships, planet)
+	_, fleet_exists := fleets[planet.Empire]
+	if fleet_exists {
 		// this planet has a defending fleet
 		return
 	}
 
-	if len(fleets) > 1{
+	if len(fleets) > 1 {
 		// this planet is still being fought over
 		return
 	}
 
 	for id := range fleets {
-		old_owner := space.Empires[planet.Id]
-		util.RemoveUint32(&old_owner.Planets, planet.Id)
+		old_owner := space.Empires[planet.Empire]
+		delete(old_owner.Planets, planet.Id)
 		new_owner := space.Empires[id]
-		new_owner.Planets = append(new_owner.Planets, planet.Id)
+		new_owner.Planets[planet.Id] = true
 		planet.Empire = id
 		planet.Control = 0.
 	}
 }
 
-func getFleets(global_ships []*pb.Ship, planet *pb.Planet) map[uint32][]*pb.Ship {
-	fleets := make(map[uint32][]*pb.Ship)
-
-	for _, id := range planet.Orbiting {
-		s := global_ships[id]
-		_, ok := fleets[s.Empire]
-		if !ok {
-			fleets[s.Empire] = []*pb.Ship{}
-		}
-
-		fleets[s.Empire] = append(fleets[s.Empire], s)
-	}
-
-	return fleets
-}
-
 func computeFight(space *state.Space, planet *pb.Planet) {
-	fleets := getFleets(space.Ships, planet)
+	fleets := state.GetFleets(space.Ships, planet)
 
 	if len(fleets) < 2 {
 		// at most one empire present
@@ -102,6 +101,8 @@ func computeControl(planet *pb.Planet) {
 	if planet.Control != 1 {
 		if planet.Control > 0.999 {
 			planet.Control = 1
+		} else if planet.Control <= 0 {
+			planet.Control = 0.001
 		} else if planet.Control > 0.5 {
 			planet.Control = planet.Control + (rand.Float32() * 0.1 * (1 - planet.Control))
 		} else {

@@ -1,8 +1,6 @@
 package main
 
 import (
-	"net"
-	"encoding/binary"
 	"net/http"
 	"github.com/ajstarks/svgo"
 	"fmt"
@@ -11,9 +9,10 @@ import (
 	"bufio"
 	"sync"
 	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
-	"github.com/golang/protobuf/proto"
+	"github.com/eqinox76/RiseAndFallOfEmpires/client"
 	"math/rand"
 	"math"
+	"github.com/eqinox76/RiseAndFallOfEmpires/state"
 )
 
 var registered []chan []byte
@@ -22,11 +21,6 @@ var mux sync.Mutex
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	conn, err := net.Dial("tcp", "localhost:9076")
-	if err != nil {
-		panic(err)
-	}
-
 	// start server
 	go func() {
 		http.HandleFunc("/space.svg", worldViewer)
@@ -34,49 +28,26 @@ func main() {
 		http.ListenAndServe(":8079", nil)
 	}()
 
-	// parse data and render it
-	header := make([]byte, 4)
+	// connect to the server and render the gamestate forever
+	c := client.Client{}
+
 	for {
-		// read len
-		if conn == nil {
-			conn, err = net.Dial("tcp", "localhost:9076")
-			if err != nil {
-				fmt.Println(err)
-				conn = nil
-				time.Sleep(500 * time.Millisecond)
-				continue
-			}
-		}
-
-		_, err := conn.Read(header)
-		if err != nil {
-			fmt.Println(err)
-			time.Sleep(500 * time.Millisecond)
-			conn.Close()
-			conn = nil
-
+		space, err := c.PollState()
+		if err != nil{
+			fmt.Errorf("%s while reading new state", err)
+			time.Sleep(1 * time.Second)
 			continue
-		}
-		l := binary.LittleEndian.Uint32(header)
-
-		msgbuffer := make([]byte, l)
-		_, err = conn.Read(msgbuffer)
-		if err != nil {
-			panic(err)
-		}
-
-		space := pb.Space{}
-		err = proto.Unmarshal(msgbuffer, &space)
-		if err != nil {
-			panic(err)
 		}
 
 		var b bytes.Buffer
 		writer := bufio.NewWriter(&b)
-		render(writer, &space)
+
+		start := time.Now()
+		render(writer, space)
+		fmt.Println(time.Now().Sub(start))
 
 		mux.Lock()
-		for _, c := range (registered) {
+		for _, c := range registered {
 			data := b.Bytes()
 			c <- data
 			close(c)
@@ -85,6 +56,7 @@ func main() {
 		mux.Unlock()
 	}
 }
+
 func render(writer *bufio.Writer, space *pb.Space) {
 	width := int(space.Width)
 	height := int(space.Height)
@@ -101,20 +73,33 @@ func render(writer *bufio.Writer, space *pb.Space) {
 		color := space.Empires[planet.Empire].Color
 		canvas.Circle(int(planet.PosX), int(planet.PosY), 10, fmt.Sprintf("fill: none; stroke: black; stroke-width: 1"))
 		canvas.Circle(int(planet.PosX), int(planet.PosY), 10, fmt.Sprintf("fill-opacity: %f; fill: %s", planet.Control, color))
-		if (planet.Empire != 0) {
-			// show id
-			canvas.Text(int(planet.PosX), int(planet.PosY)-20, fmt.Sprint("Id:", planet.Id), "text-anchor:middle;font-size:10px;fill:green")
+		if planet.Empire != 0 {
 			// show control
 			canvas.Text(int(planet.PosX), int(planet.PosY)+20, fmt.Sprint("Control:", planet.Control), "text-anchor:middle;font-size:10px;fill:green")
 			// show ships
 			canvas.Text(int(planet.PosX), int(planet.PosY)-10, fmt.Sprint("#Ships:", len(planet.Orbiting)), "text-anchor:middle;font-size:10px;fill:green")
 		}
 
-		for _, ship := range planet.Orbiting{
+		fleets := state.GetFleets(space.Ships, planet)
+		if len(fleets) > 1{
+			var text string
+			for key, value := range fleets {
+				text += fmt.Sprint(key, len(value), "|")
+			}
+			canvas.Text(int(planet.PosX), int(planet.PosY)-20, text, "text-anchor:middle;font-size:10px;fill:green")
+		}
+
+		for ship, _ := range planet.Orbiting{
 			degree := 2 * math.Pi * rand.Float64()
-			canvas.Circle(int(float64(planet.PosX) + (14 * math.Sin(degree))), int(float64(planet.PosY) + (14 * math.Cos(degree))) , 1, fmt.Sprintf("stroke: %s; stroke-width: 1", space.Empires[space.Ships[ship].Empire].Color))
+			canvas.Circle(int(float64(planet.PosX) + (14 * math.Sin(degree))),
+				int(float64(planet.PosY) + (14 * math.Cos(degree))),
+				1,
+				fmt.Sprintf("stroke: %s; stroke-width: 1", space.Empires[space.Ships[ship].Empire].Color))
 		}
 	}
+
+
+	canvas.Text(0, 10, fmt.Sprintf("Created: %s", time.Now()), "font-size:10px")
 
 	canvas.End()
 	writer.Flush()
@@ -165,7 +150,6 @@ window.requestAnimationFrame(update);
 }
 
 func worldViewer(writer http.ResponseWriter, request *http.Request) {
-	start := time.Now()
 	c := make(chan []byte)
 	mux.Lock()
 	registered = append(registered, c)
@@ -177,5 +161,4 @@ func worldViewer(writer http.ResponseWriter, request *http.Request) {
 	data := <- c
 	writer.Write(data)
 
-	fmt.Println(time.Now().Sub(start))
 }
