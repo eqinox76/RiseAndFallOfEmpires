@@ -107,7 +107,6 @@ func main() {
 			select {
 			case cmd := <-commands:
 				engine.ProcessCommand(&space, cmd)
-				fmt.Println("Command received: ", cmd)
 			default:
 				time.Sleep(10 * time.Millisecond)
 			}
@@ -156,6 +155,7 @@ func forward_game_state(con net.Conn, worker *Client) {
 	for msg := range worker.output {
 
 		_, err := con.Write(msg)
+		fmt.Println(len(msg), "written to", worker)
 
 		if err != nil {
 			fmt.Errorf("%s throws %s", worker, err)

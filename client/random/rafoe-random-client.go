@@ -51,6 +51,11 @@ func ControlLoop(empire uint32) {
 				continue
 			}
 
+			if rand.Float32() > 5. / float32(len(space.Empires[empire].Planets)){
+				//only send commands for some planets
+				continue
+			}
+
 			fleets := state.GetFleets(space.Ships, planet)
 			my_fleet := fleets[empire]
 			// if there are no enemies and we have more than 10 ships

@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"github.com/golang/protobuf/proto"
 	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
+	"io"
 	"fmt"
 )
 
@@ -28,13 +29,11 @@ func (client *Client) Connect() error {
 	return nil
 }
 
-
 func (client *Client) SendCommand(cmd *pb.Command) error {
 	data, err := proto.Marshal(cmd)
-	if err != nil{
+	if err != nil {
 		return err
 	}
-
 
 	length := make([]byte, 4)
 	binary.LittleEndian.PutUint32(length, uint32(len(data)))
@@ -65,7 +64,7 @@ func (client *Client) PollState() (*pb.Space, error) {
 	l := binary.LittleEndian.Uint32(header)
 
 	msgbuffer := make([]byte, l)
-	_, err = client.conn.Read(msgbuffer)
+	_, err = io.ReadFull(client.conn, msgbuffer)
 	if err != nil {
 		return nil, err
 	}
