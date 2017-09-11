@@ -9,10 +9,10 @@ import (
 	"bufio"
 	"sync"
 	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
-	"github.com/eqinox76/RiseAndFallOfEmpires/client"
 	"math/rand"
 	"math"
 	"github.com/eqinox76/RiseAndFallOfEmpires/state"
+	"github.com/eqinox76/RiseAndFallOfEmpires/client"
 )
 
 var registered []chan []byte
@@ -63,10 +63,23 @@ func render(writer *bufio.Writer, space *pb.Space) {
 
 	canvas := svg.New(writer)
 	canvas.Start(width, height)
+	connected := make(map[uint32] map[uint32] bool)
 	for _, planet := range space.Planets{
 		// render connection
-		for _, id := range planet.Connected {
-			canvas.Line(int(planet.PosX), int(planet.PosY), int(space.Planets[id].PosX), int(space.Planets[id].PosY), "stroke:blue; stroke-width:2; stroke-opacity: 0.2")
+		connected_ids := connected[planet.Id]
+		for _, other := range planet.Connected {
+			if connected_ids[other]{
+				// already painted from the other side
+				continue
+			}
+
+			// mark as painted
+			_, ok := connected[other]
+			if !ok{
+				connected[other] = make(map[uint32] bool)
+			}
+			connected[other][planet.Id] = true
+			canvas.Line(int(planet.PosX), int(planet.PosY), int(space.Planets[other].PosX), int(space.Planets[other].PosY), "stroke:blue; stroke-width:2; stroke-opacity: 0.2")
 		}
 
 		// render planet
@@ -77,7 +90,7 @@ func render(writer *bufio.Writer, space *pb.Space) {
 			// show control
 			// canvas.Text(int(planet.PosX), int(planet.PosY)+20, fmt.Sprint("Control:", planet.Control), "text-anchor:middle;font-size:10px;fill:green")
 			// show ships
-			canvas.Text(int(planet.PosX), int(planet.PosY)-15, fmt.Sprint(len(planet.Orbiting)), "text-anchor:middle;font-size:12px;fill:" + color)
+			canvas.Text(int(planet.PosX), int(planet.PosY)-15, fmt.Sprint(len(planet.Orbiting)), "text-anchor:middle;font-size:12px;stroke:black;stroke-width:0.25;fill:" + color)
 		}
 
 		fleets := state.GetFleets(space.Ships, planet)

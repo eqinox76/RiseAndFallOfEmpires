@@ -1,12 +1,12 @@
 package client
 
 import (
-	"net"
-	"encoding/binary"
-	"github.com/golang/protobuf/proto"
-	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
 	"io"
+	"github.com/golang/protobuf/proto"
+	"net"
 	"fmt"
+	"encoding/binary"
+	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
 )
 
 type Client struct {
@@ -27,6 +27,10 @@ func (client *Client) Connect() error {
 	fmt.Println("Connected to server")
 	client.conn = conn
 	return nil
+}
+
+func (client *Client) Close() {
+	client.conn.Close()
 }
 
 func (client *Client) SendCommand(cmd *pb.Command) error {
@@ -77,3 +81,4 @@ func (client *Client) PollState() (*pb.Space, error) {
 
 	return &space, nil
 }
+

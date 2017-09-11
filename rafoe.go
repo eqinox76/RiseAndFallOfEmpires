@@ -23,7 +23,7 @@ func main() {
 
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	space := state.NewSpace(5)
+	space := state.NewSpace(9)
 	fanOut := make(chan []byte)
 	commands := make(chan *pb.Command)
 	defer close(fanOut)
@@ -108,7 +108,7 @@ func main() {
 			case cmd := <-commands:
 				engine.ProcessCommand(&space, cmd)
 			default:
-				time.Sleep(10 * time.Millisecond)
+				time.Sleep(5 * time.Millisecond)
 			}
 		}
 	}
@@ -154,6 +154,8 @@ func process_commands(conn net.Conn, client *Client, commands chan *pb.Command) 
 func forward_game_state(con net.Conn, worker *Client) {
 	for msg := range worker.output {
 
+
+		con.SetWriteDeadline(time.Now().Add(10 * time.Millisecond))
 		_, err := con.Write(msg)
 
 		if err != nil {
