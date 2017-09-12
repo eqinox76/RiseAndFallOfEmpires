@@ -50,13 +50,14 @@ func main() {
 				fmt.Println("Error accepting: ", err.Error())
 				os.Exit(1)
 			}
-			fmt.Println("New client")
+
 			mutex.Lock()
 
 			client := Client{output: make(chan []byte)}
 			workers = append(workers, &client)
 
 			mutex.Unlock()
+			fmt.Println("New client", client)
 			// and start the client
 			go forward_game_state(con, &client)
 			go process_commands(con, &client, commands)
@@ -75,10 +76,11 @@ func main() {
 					// this worker is done so close it
 					close(w.output)
 					workers[i] = workers[removed]
-					fmt.Println("Client closed")
+					fmt.Println(w, " removed")
 					removed++
 				} else {
 					w.output <- msg
+					//fmt.Println(w, len(w.output), len(fanOut))
 				}
 			}
 
@@ -100,7 +102,7 @@ func main() {
 		}
 		//fmt.Printf("serialize: %d, Planets: %d Ships: %d\n", len(bytes), len(space.Planets), len(space.Ships))
 		fanOut <- bytes
-		fmt.Println(time.Now().Sub(start))
+		//fmt.Println(time.Now().Sub(start))
 
 		// scan for one second the commands. After that compute the next state
 		for start.Add(100 * time.Millisecond).After(time.Now()) {
@@ -155,11 +157,11 @@ func forward_game_state(con net.Conn, worker *Client) {
 	for msg := range worker.output {
 
 
-		con.SetWriteDeadline(time.Now().Add(10 * time.Millisecond))
+		con.SetWriteDeadline(time.Now().Add(50 * time.Millisecond))
 		_, err := con.Write(msg)
 
 		if err != nil {
-			fmt.Errorf("%s throws %s", worker, err)
+			fmt.Println(worker, " closed due to ", err)
 			break
 		}
 	}

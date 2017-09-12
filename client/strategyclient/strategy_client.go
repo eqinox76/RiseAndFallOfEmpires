@@ -45,7 +45,8 @@ func ControlLoop(empire uint32, f func(space *pb.Space, planet *pb.Planet, empir
 		space, err := c.PollState()
 
 		if err != nil {
-			panic(err)
+			c.Close()
+			continue
 		}
 
 		start := time.Now()
@@ -67,7 +68,7 @@ func ControlLoop(empire uint32, f func(space *pb.Space, planet *pb.Planet, empir
 			break
 		}
 
-		fmt.Println(time.Now().Sub(start))
+		fmt.Println(empire, time.Now().Sub(start))
 
 		err = c.SendCommand(&response)
 		if err != nil {

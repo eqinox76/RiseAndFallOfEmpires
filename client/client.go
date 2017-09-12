@@ -31,6 +31,7 @@ func (client *Client) Connect() error {
 
 func (client *Client) Close() {
 	client.conn.Close()
+	client.conn = nil
 }
 
 func (client *Client) SendCommand(cmd *pb.Command) error {
