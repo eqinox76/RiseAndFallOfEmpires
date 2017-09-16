@@ -13,6 +13,8 @@ import (
 	"math"
 	"github.com/eqinox76/RiseAndFallOfEmpires/state"
 	"github.com/eqinox76/RiseAndFallOfEmpires/client"
+	"sort"
+	"strings"
 )
 
 var registered []chan []byte
@@ -84,22 +86,25 @@ func render(writer *bufio.Writer, space *pb.Space) {
 
 		// render planet
 		color := space.Empires[planet.Empire].Color
+		canvas.Circle(int(planet.PosX), int(planet.PosY), 8, fmt.Sprintf("fill-opacity: %f; fill: %s", planet.Control, color))
+		canvas.Circle(int(planet.PosX), int(planet.PosY), 8, fmt.Sprintf("fill: none; stroke: %s; stroke-width: 4", color))
 		canvas.Circle(int(planet.PosX), int(planet.PosY), 10, fmt.Sprintf("fill: none; stroke: black; stroke-width: 1"))
-		canvas.Circle(int(planet.PosX), int(planet.PosY), 10, fmt.Sprintf("fill-opacity: %f; fill: %s", planet.Control, color))
+		fleets := state.GetFleets(space.Ships, planet)
 		if planet.Empire != 0 {
 			// show control
 			// canvas.Text(int(planet.PosX), int(planet.PosY)+20, fmt.Sprint("Control:", planet.Control), "text-anchor:middle;font-size:10px;fill:green")
 			// show ships
-			canvas.Text(int(planet.PosX), int(planet.PosY)-15, fmt.Sprint(len(planet.Orbiting)), "text-anchor:middle;font-size:12px;stroke:black;stroke-width:0.25;fill:" + color)
+			canvas.Text(int(planet.PosX), int(planet.PosY)-15, fmt.Sprint(len(fleets[planet.Empire])), "text-anchor:middle;font-size:12px;stroke:black;stroke-width:0.25;fill:" + color)
 		}
 
-		fleets := state.GetFleets(space.Ships, planet)
+
 		if len(fleets) > 1{
-			var text string
+			var text []string
 			for key, value := range fleets {
-				text += fmt.Sprintf("%s: %d,", space.Empires[key].Color, len(value))
+				text = append(text, fmt.Sprintf("%s: %d,", space.Empires[key].Color, len(value)))
 			}
-			canvas.Text(int(planet.PosX), int(planet.PosY)-20, text, "text-anchor:middle;font-size:10px;fill:green")
+			sort.Strings(text)
+			canvas.Text(int(planet.PosX), int(planet.PosY)-25, strings.Join(text, ";"), "text-anchor:middle;font-size:10px;fill:green")
 		}
 
 		// show at most 50 ships

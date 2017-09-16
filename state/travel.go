@@ -7,6 +7,7 @@ import (
 // only needed to add a marker to easily stop bfs
 type node struct{
 	planet *pb.Planet
+	former *pb.Planet
 	generation uint32
 }
 
@@ -37,7 +38,7 @@ func NewGraph(planets map[uint32]*pb.Planet) Graph {
 	return elems
 }
 
-func (elems Graph) visit(root node, f func(planet *pb.Planet)){
+func (elems Graph) Visit(root node, f func(planet *pb.Planet) bool){
 	generation++
 	queue := make([]node, 0)
 
@@ -48,7 +49,10 @@ func (elems Graph) visit(root node, f func(planet *pb.Planet)){
 			continue
 		}
 
-		f(elem.planet)
+		cont := f(elem.planet)
+		if !cont{
+			return
+		}
 		elem.generation = generation
 
 		// visit children
@@ -62,8 +66,9 @@ func (elems Graph) GraphSize(root *pb.Planet) int{
 
 	count := 0
 
-	elems.visit(elems[root.Id], func(planet *pb.Planet){
+	elems.Visit(elems[root.Id], func(planet *pb.Planet) bool{
 		count++
+		return true
 	})
 
 	return count

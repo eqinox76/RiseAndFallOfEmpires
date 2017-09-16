@@ -35,7 +35,11 @@ func main() {
 			continue
 		}
 		wg.Add(1)
-		go ControlLoop(id, simple.DistributeStrategy, state_channel, response_channel)
+		if id % 2 == 0 {
+			go ControlLoop(id, simple.DistributeStrategy, state_channel, response_channel)
+		} else {
+			go ControlLoop(id, simple.RandomStrategy, state_channel, response_channel)
+		}
 	}
 
 	finish_channel := make(chan bool)
@@ -103,7 +107,6 @@ func ControlLoop(empire uint32, f func(space *pb.Space, planet *pb.Planet, empir
 		}
 
 		if ! owns_planet {
-			fmt.Println(space.Empires[empire].Color, " has no planets any longer.")
 			break
 		}
 

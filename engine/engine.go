@@ -16,6 +16,12 @@ func Step(space *state.Space) {
 		computeFight(space, planet)
 		computeOwner(space, planet)
 	}
+
+	for _, empire := range space.Empires{
+		if len(empire.Planets) + len(empire.Ships) == 0{
+			delete(space.Empires, empire.Id)
+		}
+	}
 	return
 }
 func computeProduction(space *state.Space, planet *pb.Planet) {

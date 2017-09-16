@@ -94,6 +94,14 @@ func main() {
 
 	// compute game state
 	for {
+		if len(space.Empires) == 1{
+			// restart the game
+			for _, w := range workers{
+				w.Done = true
+			}
+			space = state.NewSpace(9)
+		}
+
 		start := time.Now()
 		engine.Step(&space)
 		bytes, err := state.Serialize(&space)
