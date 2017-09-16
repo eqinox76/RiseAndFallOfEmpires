@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"encoding/binary"
 	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
+	"time"
 )
 
 type Client struct {
@@ -17,10 +18,7 @@ func (client *Client) Connect() error {
 	conn, err := net.Dial("tcp", "localhost:9076")
 
 	if err != nil {
-		if client.conn != nil {
-			client.conn.Close()
-		}
-		client.conn = nil
+		client.Close()
 		return err
 	}
 
@@ -30,8 +28,10 @@ func (client *Client) Connect() error {
 }
 
 func (client *Client) Close() {
-	client.conn.Close()
-	client.conn = nil
+	if client.conn != nil {
+		client.conn.Close()
+		client.conn = nil
+	}
 }
 
 func (client *Client) SendCommand(cmd *pb.Command) error {
@@ -59,27 +59,34 @@ func (client *Client) PollState() (*pb.Space, error) {
 		}
 	}
 
+	client.conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	start := time.Now()
 	_, err := client.conn.Read(header)
+	io_time := time.Now().Sub(start)
 	if err != nil {
-		client.conn.Close()
-		client.conn = nil
+		client.Close()
 		return nil, err
 	}
 
 	l := binary.LittleEndian.Uint32(header)
 
 	msgbuffer := make([]byte, l)
+	start = time.Now()
 	_, err = io.ReadFull(client.conn, msgbuffer)
+	io_time += time.Now().Sub(start)
 	if err != nil {
 		return nil, err
 	}
 
 	space := pb.Space{}
+	start = time.Now()
 	err = proto.Unmarshal(msgbuffer, &space)
+	unmarshal_time := time.Now().Sub(start)
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Printf("unmarshalled %d bytes in %s s with io %s s\n", l, unmarshal_time, io_time)
+
 	return &space, nil
 }
-

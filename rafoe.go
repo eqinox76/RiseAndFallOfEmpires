@@ -157,7 +157,7 @@ func forward_game_state(con net.Conn, worker *Client) {
 	for msg := range worker.output {
 
 
-		con.SetWriteDeadline(time.Now().Add(50 * time.Millisecond))
+		con.SetWriteDeadline(time.Now().Add(150 * time.Millisecond))
 		_, err := con.Write(msg)
 
 		if err != nil {
