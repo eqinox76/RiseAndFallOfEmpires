@@ -10,6 +10,7 @@ import (
 	_ "net/http/pprof"
 	"log"
 	"net/http"
+	"github.com/eqinox76/RiseAndFallOfEmpires/client/special"
 )
 
 var wg sync.WaitGroup
@@ -35,10 +36,12 @@ func main() {
 			continue
 		}
 		wg.Add(1)
-		if id < 3 {
+		if id % 3 == 0 {
 			go ControlLoop(id, simple.DistributeStrategy, state_channel, response_channel)
-		} else {
+		} else if id % 2 == 0 {
 			go ControlLoop(id, simple.RandomStrategy, state_channel, response_channel)
+		} else {
+			go ControlLoop(id, special.FergsnStrategy, state_channel, response_channel)
 		}
 	}
 
