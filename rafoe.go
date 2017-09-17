@@ -113,7 +113,7 @@ func main() {
 		//fmt.Println(time.Now().Sub(start))
 
 		// scan for one second the commands. After that compute the next state
-		for start.Add(100 * time.Millisecond).After(time.Now()) {
+		for start.Add(150 * time.Millisecond).After(time.Now()) {
 			select {
 			case cmd := <-commands:
 				engine.ProcessCommand(&space, cmd)

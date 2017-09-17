@@ -89,6 +89,9 @@ func render(writer *bufio.Writer, space *pb.Space) {
 		canvas.Circle(int(planet.PosX), int(planet.PosY), 8, fmt.Sprintf("fill-opacity: %f; fill: %s", planet.Control, color))
 		canvas.Circle(int(planet.PosX), int(planet.PosY), 8, fmt.Sprintf("fill: none; stroke: %s; stroke-width: 4", color))
 		canvas.Circle(int(planet.PosX), int(planet.PosY), 10, fmt.Sprintf("fill: none; stroke: black; stroke-width: 1"))
+
+		//canvas.Text(int(planet.PosX), int(planet.PosY)-25, fmt.Sprint(planet.Id), "text-anchor:middle;font-size:10px;fill:blue")
+
 		fleets := state.GetFleets(space.Ships, planet)
 		if planet.Empire != 0 {
 			// show control

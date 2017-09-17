@@ -4,17 +4,16 @@ import (
 	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
 	"github.com/eqinox76/RiseAndFallOfEmpires/state"
 	"math"
-	"math/rand"
 )
 
-var matchingspace *pb.Space
-var graph state.Graph
+var matchingspace map[uint32]*pb.Space = make(map[uint32]*pb.Space)
+var graph map[uint32]state.Graph = make(map[uint32]state.Graph)
 
 func DistributeStrategy(space *pb.Space, planet *pb.Planet, empire uint32, response *pb.Command) {
-	if matchingspace != space {
+	if matchingspace[empire] != space {
 		// make sure we have a graph about this space
-		graph = state.NewGraph(space.Planets)
-		matchingspace = space
+		graph[empire] = state.NewGraph(space.Planets)
+		matchingspace[empire] = space
 	}
 
 	// search weakest neighbor with enemy ships or planet
@@ -71,13 +70,22 @@ func DistributeStrategy(space *pb.Space, planet *pb.Planet, empire uint32, respo
 
 	if len(fleets) == 1 {
 		// there are no bordering enemy planets. Send the whole fleet in the direction of trouble
-		target := planet.Connected[rand.Intn(len(planet.Connected))]
+		var target_id uint32
+		graph[empire].Visit(graph[empire][planet.Id], func(n state.Node) bool {
+			if n.Planet.Empire != empire{
+				target_id = n.Planet.Id
+				return false
+			}
+			return true
+		})
 
-		for count := 0; count < len(own_fleet); count ++ {
+		target := graph[empire].ShortestPath(planet.Id, target_id, true)
+
+		for count := 0; count < (len(own_fleet) * 2 / 3.); count ++ {
 			order := pb.MovementOrder{
 				Ship:        own_fleet[count].Id,
 				Start:       planet.Id,
-				Destination: target,
+				Destination: target[1],
 			}
 
 			response.Orders = append(response.Orders, &pb.Command_Order{

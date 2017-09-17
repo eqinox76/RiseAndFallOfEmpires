@@ -34,14 +34,14 @@ func (space *Space) RemoveShip(ship *pb.Ship) {
 	// remove from global ships
 	delete(space.Ships, ship.Id)
 
-	// remove from planet
+	// remove from Planet
 	switch x := ship.GetPosition().(type) {
 	case *pb.Ship_Orbiting:
 		planet := space.Planets[x.Orbiting]
 
 		delete(planet.Orbiting, ship.Id)
 	default:
-		panic(fmt.Sprintf("A destroyed ship is not orbiting a planet! %T", x))
+		panic(fmt.Sprintf("A destroyed ship is not orbiting a Planet! %T", x))
 	}
 
 	// remove from empire
@@ -222,7 +222,7 @@ func NewSpace(empires int) Space {
 	neutralEmpire.Passive = true
 
 	// add planets
-	for i := uint32(0); i < 60; i++ {
+	for i := uint32(0); i < 200; i++ {
 		space.CreatePlanet(neutralEmpire)
 	}
 
@@ -252,8 +252,7 @@ func NewSpace(empires int) Space {
 
 	// add lanes between planets
 	// this is done by adding all edged for a minimal spanning tree based on distance
-	// thereafter some planets are randomly connected with their n-nrearest neighbors but with decreasing likelyhood
-	root := space.Planets[0]
+	root := space.Graph[space.Planets[0].Id]
 	for _, edge := range edges {
 		if space.Graph.GraphSize(root) == len(space.Planets) {
 			// done
@@ -273,6 +272,7 @@ func NewSpace(empires int) Space {
 		}
 	}
 
+	// thereafter some planets are randomly connected with their n-nrearest neighbors but with decreasing likelyhood
 	max_connections := int(math.Pow(float64(len(space.Planets)), 1./4.))
 	for size := 1; size < max_connections; size++ {
 		for _, planet := range space.Planets {
@@ -287,8 +287,19 @@ func NewSpace(empires int) Space {
 				panic(nn[size+1])
 			}
 
-			planet.Connected = append(planet.Connected, to.Id)
-			to.Connected = append(to.Connected, planet.Id)
+			// check if this edge already exists
+			exists := false
+			for _, id := range planet.Connected{
+				if id == to.Id{
+					exists = true
+					break;
+				}
+			}
+
+			if !exists {
+				planet.Connected = append(planet.Connected, to.Id)
+				to.Connected = append(to.Connected, planet.Id)
+			}
 		}
 	}
 

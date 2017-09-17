@@ -35,7 +35,7 @@ func main() {
 			continue
 		}
 		wg.Add(1)
-		if id % 2 == 0 {
+		if id < 3 {
 			go ControlLoop(id, simple.DistributeStrategy, state_channel, response_channel)
 		} else {
 			go ControlLoop(id, simple.RandomStrategy, state_channel, response_channel)
