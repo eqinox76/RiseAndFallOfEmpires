@@ -6,14 +6,16 @@ import (
 	"math"
 )
 
-var matchingspace map[uint32]*pb.Space = make(map[uint32]*pb.Space)
-var graph map[uint32]state.Graph = make(map[uint32]state.Graph)
+type Distributed struct {
+	matchingspace *pb.Space
+	graph         state.Graph
+}
 
-func DistributeStrategy(space *pb.Space, planet *pb.Planet, empire uint32, response *pb.Command) {
-	if matchingspace[empire] != space {
+func (dist *Distributed) DistributeStrategy(space *pb.Space, planet *pb.Planet, empire uint32, response *pb.Command) {
+	if dist.matchingspace != space {
 		// make sure we have a graph about this space
-		graph[empire] = state.NewGraph(space.Planets)
-		matchingspace[empire] = space
+		dist.graph = state.NewGraph(space.Planets)
+		dist.matchingspace = space
 	}
 
 	// search weakest neighbor with enemy ships or planet
@@ -21,7 +23,6 @@ func DistributeStrategy(space *pb.Space, planet *pb.Planet, empire uint32, respo
 	lowest_neighbor := uint32(0)
 	fleets := state.GetFleets(space.Ships, planet)
 	own_fleet, _ := fleets[empire]
-
 
 	for _, p_id := range planet.Connected {
 		fleets := state.GetFleets(space.Ships, space.Planets[p_id])
@@ -71,15 +72,15 @@ func DistributeStrategy(space *pb.Space, planet *pb.Planet, empire uint32, respo
 	if len(fleets) == 1 {
 		// there are no bordering enemy planets. Send the whole fleet in the direction of trouble
 		var target_id uint32
-		graph[empire].Visit(graph[empire][planet.Id], func(n state.Node) bool {
-			if n.Planet.Empire != empire{
+		dist.graph.Visit(dist.graph[planet.Id], func(n state.Node) bool {
+			if n.Planet.Empire != empire {
 				target_id = n.Planet.Id
 				return false
 			}
 			return true
 		})
 
-		target := graph[empire].ShortestPath(planet.Id, target_id, true)
+		target := dist.graph.ShortestPath(planet.Id, target_id, true)
 
 		for count := 0; count < (len(own_fleet) * 2 / 3.); count ++ {
 			order := pb.MovementOrder{

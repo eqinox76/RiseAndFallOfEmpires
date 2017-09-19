@@ -36,7 +36,7 @@ func (client *Client) Close() {
 
 func (client *Client) SendCommand(cmd *pb.Command) error {
 	if client == nil || client.conn == nil {
-		fmt.Errorf("connection already closed")
+		return fmt.Errorf("connection already closed")
 	}
 
 	data, err := proto.Marshal(cmd)

@@ -24,8 +24,10 @@ func main() {
 	c := client.Client{}
 	space, err := c.PollState()
 
-	state_channel := make(chan *pb.Space)
-	response_channel := make (chan *pb.Command)
+	clientChannels := make(map[uint32]chan *pb.Space, 0)
+	// TODO need to close the channel when the empire has lost
+	responseChannel := make(chan *pb.Command)
+	doneChannel := make(chan uint32, 100)
 
 	if err != nil {
 		panic(err)
@@ -36,38 +38,58 @@ func main() {
 			continue
 		}
 		wg.Add(1)
-		if id % 3 == 0 {
-			go ControlLoop(id, simple.DistributeStrategy, state_channel, response_channel)
-		} else if id % 2 == 0 {
-			go ControlLoop(id, simple.RandomStrategy, state_channel, response_channel)
+		clientChannels[id] = make(chan *pb.Space, 20)
+		if id < 2 {
+			d := simple.Distributed{}
+			go ControlLoop(id, d.DistributeStrategy, clientChannels[id], doneChannel, responseChannel)
+		} else if id%2 == 0 {
+			go ControlLoop(id, simple.RandomStrategy, clientChannels[id], doneChannel, responseChannel)
 		} else {
-			go ControlLoop(id, special.FergsnStrategy, state_channel, response_channel)
+			go ControlLoop(id, special.FergsnStrategy, clientChannels[id], doneChannel, responseChannel)
 		}
 	}
 
-	finish_channel := make(chan bool)
+	finishChannel := make(chan bool)
 
 	defer func() {
-		finish_channel <- true
-		close(finish_channel)
-		close(response_channel)
+		finishChannel <- true
+		close(finishChannel)
+		close(responseChannel)
 	}()
 
 	go func() {
-		defer close(state_channel)
 		defer c.Close()
-		for len(finish_channel) == 0 {
+		// wait until the finish channel has been called to clean everything up
+		for len(finishChannel) == 0 {
 			space, err := c.PollState()
 
 			if err != nil {
 				c.Close()
 				continue
 			}
-			state_channel <- space
+
+			for _, c := range clientChannels {
+				c <- space
+			}
+
+			// check if a client is done
+			select {
+			case empire := <- doneChannel:
+				fmt.Println(empire, " is done.")
+
+				close(clientChannels[empire])
+				delete(clientChannels, empire)
+			default:
+			}
+		}
+		for _, c := range clientChannels {
+			close(c)
 		}
 	}()
+
+	// send commands
 	go func() {
-		for response := range response_channel {
+		for response := range responseChannel {
 			err := c.SendCommand(response)
 			if err != nil {
 				fmt.Println(err)
@@ -75,14 +97,12 @@ func main() {
 		}
 	}()
 
-
-
 	wg.Wait()
 }
 
-func ControlLoop(empire uint32, f func(space *pb.Space, planet *pb.Planet, empire uint32, response *pb.Command), state_channel chan *pb.Space, response_channel chan *pb.Command) {
+func ControlLoop(empire uint32, f func(space *pb.Space, planet *pb.Planet, empire uint32, response *pb.Command), state_channel chan *pb.Space, doneChannel chan uint32, response_channel chan *pb.Command) {
 	defer func() {
-		fmt.Println(empire, " lost")
+		doneChannel <- empire
 		wg.Done()
 	}()
 

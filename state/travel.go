@@ -66,9 +66,15 @@ func (g Graph) Visit(root Node, f func(n Node) bool) {
 				continue
 			}
 			queue = append(queue, &g[child])
-			if g[child].generation < generation - 1 || g[child].dist == 0 || g[child].dist > elem.dist+1 {
+
+			if g[child].generation < generation-1 || // never seen this child
+				g[child].dist > elem.dist+1 { // the current path is shorter than the old one
+
+				// set distance and paht
 				g[child].dist = elem.dist + 1
 				g[child].former = elem.Planet.Id
+				// mark as seen
+				g[child].generation = generation - 1
 			}
 		}
 	}
@@ -81,27 +87,27 @@ func (g Graph) ShortestPath(root uint32, target uint32, graph_is_prepared bool) 
 		})
 	}
 
-	path := make([]uint32,0)
+	path := make([]uint32, 0)
 
 	cur := g[target]
 	path = append(path, cur.Planet.Id)
 	for !cur.Equal(g[root]) {
 		path = append(path, cur.former)
 		cur = g[cur.former]
-		if len(path) > 500{
+		if len(path) > 500 {
 			fmt.Println(root, g[root].Planet.Connected)
 			fmt.Println(target, g[target].Planet.Connected)
 			fmt.Println(path)
-			for i:=0; i< 5; i++{
-				fmt.Println("  ", path[i], g[path[i]].Planet.Connected)
+			for i := 0; i < 5; i++ {
+				fmt.Println("  ", path[i], g[path[i]].Planet.Connected, "dist", g[path[i]].dist, "former", g[path[i]].former, "gen", g[path[i]].generation)
 			}
 			log.Panicf("Unintended behavior when checking path from %d to %d ", root, target, path)
 		}
 	}
 
 	//revert path
-	for i := 0; i < len(path) / 2; i++{
-		path[i], path[len(path) - 1 -i ] = path[len(path) - 1 -i ], path[i]
+	for i := 0; i < len(path)/2; i++ {
+		path[i], path[len(path)-1-i ] = path[len(path)-1-i ], path[i]
 	}
 
 	return path

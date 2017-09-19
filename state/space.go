@@ -430,6 +430,10 @@ func GetFleets(global_ships map[uint64]*pb.Ship, planet *pb.Planet) map[uint32][
 	return fleets
 }
 
+func (space *Space) Won() bool{
+	return len(space.Empires) == 1
+}
+
 func Serialize(space *Space) ([]byte, error) {
 
 	data, err := proto.Marshal(&space.Space)

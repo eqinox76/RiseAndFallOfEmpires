@@ -12,6 +12,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
 	"encoding/binary"
+	"flag"
 )
 
 type Client struct {
@@ -19,9 +20,11 @@ type Client struct {
 	Done   bool
 }
 
-func main() {
+var maxWaitForCommands = flag.Int("maxWaitForCommands", 1000, "max time we wait for all clients to send commands in ms")
 
+func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
+	flag.Parse()
 
 	space := state.NewSpace(9)
 	fanOut := make(chan []byte)
@@ -92,31 +95,27 @@ func main() {
 		}
 	}()
 
-	// compute game state
-	for {
-		if len(space.Empires) == 1{
-			// restart the game
-			for _, w := range workers{
-				w.Done = true
-			}
-			space = state.NewSpace(9)
-		}
-
+	// compute game state forever
+	for ! space.Won() {
 		start := time.Now()
 		engine.Step(&space)
+
 		bytes, err := state.Serialize(&space)
 		if err != nil {
 			panic(err)
 		}
 		//fmt.Printf("serialize: %d, Planets: %d Ships: %d\n", len(bytes), len(space.Planets), len(space.Ships))
 		fanOut <- bytes
-		//fmt.Println(time.Now().Sub(start))
+		fmt.Println(time.Now().Sub(start))
 
-		// scan for one second the commands. After that compute the next state
-		for start.Add(150 * time.Millisecond).After(time.Now()) {
+		commandsReceived := make(map[uint32]bool)
+		// scan for the commands. After that compute the next state
+		for len(commandsReceived) != len(space.Empires) - 1 && start.Add(time.Duration(*maxWaitForCommands) * time.Millisecond).After(time.Now()) {
 			select {
 			case cmd := <-commands:
 				engine.ProcessCommand(&space, cmd)
+				commandsReceived[cmd.Empire] = true
+				// check if all empires (minus the passive one) have send a command
 			default:
 				time.Sleep(5 * time.Millisecond)
 			}
@@ -163,7 +162,6 @@ func process_commands(conn net.Conn, client *Client, commands chan *pb.Command) 
 
 func forward_game_state(con net.Conn, worker *Client) {
 	for msg := range worker.output {
-
 
 		con.SetWriteDeadline(time.Now().Add(150 * time.Millisecond))
 		_, err := con.Write(msg)
