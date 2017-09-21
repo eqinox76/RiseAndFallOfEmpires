@@ -1,2 +1,2 @@
-protoc --go_out=. proto/*.proto
+protoc --gofast_out=. proto/*.proto
 
