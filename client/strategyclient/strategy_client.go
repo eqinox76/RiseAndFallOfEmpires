@@ -6,11 +6,11 @@ import (
 	"github.com/eqinox76/RiseAndFallOfEmpires/client"
 	"fmt"
 	"sync"
-	"time"
 	_ "net/http/pprof"
 	"log"
 	"net/http"
 	"github.com/eqinox76/RiseAndFallOfEmpires/client/special"
+	"math/rand"
 )
 
 var wg sync.WaitGroup
@@ -39,12 +39,14 @@ func main() {
 		}
 		wg.Add(1)
 		clientChannels[id] = make(chan *pb.Space, 20)
-		if id%3 == 0 {
+		ki := rand.Intn(3)
+		switch ki {
+		case 0:
 			d := simple.Distributed{}
 			go ControlLoop(id, d.DistributeStrategy, clientChannels[id], doneChannel, responseChannel)
-		} else if id%2 == 0 {
+		case 1:
 			go ControlLoop(id, simple.RandomStrategy, clientChannels[id], doneChannel, responseChannel)
-		} else {
+		case 2:
 			go ControlLoop(id, special.FergsnStrategy, clientChannels[id], doneChannel, responseChannel)
 		}
 	}
@@ -114,12 +116,16 @@ func ControlLoop(empire uint32, f func(space *pb.Space, planet *pb.Planet, empir
 			continue
 		}
 
+		// if we have lost terminate
 		emp, ok := space.Empires[empire]
 		if !ok || len(emp.Ships)+len(emp.Planets) == 0 {
 			break
 		}
+		// or if the game has ended
+		if len(space.Empires) <= 2{
+			break
+		}
 
-		start := time.Now()
 		response := pb.Command{
 			Empire: empire,
 		}
@@ -131,8 +137,6 @@ func ControlLoop(empire uint32, f func(space *pb.Space, planet *pb.Planet, empir
 
 			f(space, planet, empire, &response)
 		}
-
-		fmt.Println(empire, time.Now().Sub(start))
 
 		response_channel <- &response
 	}
