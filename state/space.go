@@ -252,7 +252,7 @@ func NewSpace(empires int) Space {
 
 	// add lanes between planets
 	// this is done by adding all edged for a minimal spanning tree based on distance
-	root := space.Graph[space.Planets[0].Id]
+	root := space.Graph.nodes[space.Planets[0].Id]
 	for _, edge := range edges {
 		if space.Graph.GraphSize(root) == len(space.Planets) {
 			// done
@@ -431,7 +431,7 @@ func GetFleets(global_ships map[uint64]*pb.Ship, planet *pb.Planet) map[uint32][
 }
 
 func (space *Space) Won() bool{
-	return len(space.Empires) == 1
+	return len(space.Empires) == 2
 }
 
 func Serialize(space *Space) ([]byte, error) {

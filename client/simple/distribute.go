@@ -72,7 +72,7 @@ func (dist *Distributed) DistributeStrategy(space *pb.Space, planet *pb.Planet, 
 	if len(fleets) == 1 {
 		// there are no bordering enemy planets. Send the whole fleet in the direction of trouble
 		var target_id uint32
-		dist.graph.Visit(dist.graph[planet.Id], func(n state.Node) bool {
+		dist.graph.Visit(planet.Id, func(n state.Node) bool {
 			if n.Planet.Empire != empire {
 				target_id = n.Planet.Id
 				return false
@@ -81,6 +81,9 @@ func (dist *Distributed) DistributeStrategy(space *pb.Space, planet *pb.Planet, 
 		})
 
 		target := dist.graph.ShortestPath(planet.Id, target_id, true)
+		if len(target) < 2{
+			return
+		}
 
 		for count := 0; count < (len(own_fleet) * 2 / 3.); count ++ {
 			order := pb.MovementOrder{

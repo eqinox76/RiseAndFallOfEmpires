@@ -90,7 +90,7 @@ func render(writer *bufio.Writer, space *pb.Space) {
 		canvas.Circle(int(planet.PosX), int(planet.PosY), 8, fmt.Sprintf("fill: none; stroke: %s; stroke-width: 4", color))
 		canvas.Circle(int(planet.PosX), int(planet.PosY), 10, fmt.Sprintf("fill: none; stroke: black; stroke-width: 1"))
 
-		canvas.Text(int(planet.PosX), int(planet.PosY)-25, fmt.Sprint(planet.Id), "text-anchor:middle;font-size:10px;fill:blue")
+		//canvas.Text(int(planet.PosX), int(planet.PosY)-25, fmt.Sprint(planet.Id), "text-anchor:middle;font-size:10px;fill:blue")
 
 		fleets := state.GetFleets(space.Ships, planet)
 		if planet.Empire != 0 {
@@ -104,10 +104,10 @@ func render(writer *bufio.Writer, space *pb.Space) {
 		if len(fleets) > 1{
 			var text []string
 			for key, value := range fleets {
-				text = append(text, fmt.Sprintf("%s: %d,", space.Empires[key].Color, len(value)))
+				text = append(text, fmt.Sprintf("%s: %d", space.Empires[key].Color, len(value)))
 			}
 			sort.Strings(text)
-			canvas.Text(int(planet.PosX), int(planet.PosY)-25, strings.Join(text, ";"), "text-anchor:middle;font-size:10px;fill:green")
+			canvas.Text(int(planet.PosX), int(planet.PosY)-25, strings.Join(text, ", "), "text-anchor:middle;font-size:10px;fill:green")
 		}
 
 		// show at most 50 ships

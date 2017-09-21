@@ -39,7 +39,7 @@ func main() {
 		}
 		wg.Add(1)
 		clientChannels[id] = make(chan *pb.Space, 20)
-		if id < 2 {
+		if id%3 == 0 {
 			d := simple.Distributed{}
 			go ControlLoop(id, d.DistributeStrategy, clientChannels[id], doneChannel, responseChannel)
 		} else if id%2 == 0 {
@@ -74,7 +74,7 @@ func main() {
 
 			// check if a client is done
 			select {
-			case empire := <- doneChannel:
+			case empire := <-doneChannel:
 				fmt.Println(empire, " is done.")
 
 				close(clientChannels[empire])
@@ -114,23 +114,22 @@ func ControlLoop(empire uint32, f func(space *pb.Space, planet *pb.Planet, empir
 			continue
 		}
 
+		emp, ok := space.Empires[empire]
+		if !ok || len(emp.Ships)+len(emp.Planets) == 0 {
+			break
+		}
+
 		start := time.Now()
 		response := pb.Command{
 			Empire: empire,
 		}
 
-		owns_planet := false
 		for _, planet := range space.Planets {
 			if planet.Empire != empire {
 				continue
 			}
 
 			f(space, planet, empire, &response)
-			owns_planet = true
-		}
-
-		if ! owns_planet {
-			break
 		}
 
 		fmt.Println(empire, time.Now().Sub(start))

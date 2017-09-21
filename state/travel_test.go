@@ -19,8 +19,8 @@ func TestCycle(t *testing.T) {
 
 	g := NewGraph(planets)
 
-	if g.GraphSize(g[0]) != 3 {
-		t.Error("Wrong size!", g.GraphSize(g[0]))
+	if g.GraphSize(g.nodes[0]) != 3 {
+		t.Error("Wrong size!", g.GraphSize(g.nodes[0]))
 	}
 
 	if g.HasCycle(planets[0]) || g.HasCycle(planets[1]) || g.HasCycle(planets[2]) {
@@ -105,9 +105,9 @@ func TestShortestPathWithLoop(t *testing.T) {
 func TestShortestPathRealWorld(t *testing.T) {
 	//         50
 	//        /  \
-	// 173 - 7 - 178 - 36
+	// 173 - 7 - 178 - 36 - 100
 	// |     |
-	// 60   167 - 39
+	// 60   167 - 39 - 156
 
 	planets := make(map[uint32]*pb.Planet)
 	for i := uint32(0); i < 180; i++ {
@@ -124,21 +124,37 @@ func TestShortestPathRealWorld(t *testing.T) {
 	planets[60].Connected = append(planets[60].Connected, 173)
 
 	g := NewGraph(planets)
+	path := g.ShortestPath(50, 39, false)
 
-	check := func(start uint32, dest uint32) {
-		path := g.ShortestPath(start, dest, false)
-		//fmt.Println(start, dest, path)
-
-		path = g.ShortestPath(50, 39, false)
-
-		if ! reflect.DeepEqual(path, []uint32{50, 7, 167, 39}) {
-			t.Error(path, "expected to be [50, 7, 167, 39]")
-		}
+	if ! reflect.DeepEqual(path, []uint32{50, 7, 167, 39}) {
+		t.Error(path, "expected to be [50, 7, 167, 39]")
 	}
 
-	check(60, 36)
-	check(178, 60)
-	check(7, 36)
+	stop := false
+
+	go func() {
+		innerGraph := NewGraph(planets)
+
+		for !stop {
+			path := innerGraph.ShortestPath(36, 178, false)
+
+			if ! reflect.DeepEqual(path, []uint32{36, 178}) {
+				t.Error(path, "expected to be [36, 178]")
+			}
+		}
+	}()
+
+	check := func(start uint32, dest uint32) {
+		g.ShortestPath(start, dest, false)
+	}
+
+	for i:= 0; i < 10000; i++ {
+		check(173, 36)
+		//check(178, 60)
+		//check(7, 36)
+	}
+
+	stop = true
 }
 
 func TestShortestPathRealWorld2(t *testing.T) {
@@ -192,20 +208,37 @@ func TestShortestPathRealWorld3(t *testing.T) {
 	planets[158].Connected = append(planets[158].Connected, 29, 199, 17)
 	planets[95].Connected = append(planets[95].Connected, 52, 73)
 
+
+	stop := false
 	g := NewGraph(planets)
+
+	go func() {
+		g := NewGraph(planets)
+
+		for !stop {
+			path := g.ShortestPath(52, 158, false)
+
+			if ! reflect.DeepEqual(path, []uint32{52, 73, 123, 29, 158}) {
+				t.Error(path, "expected to be [52 73 123 29 158]")
+			}
+		}
+	}()
 
 	check := func(start uint32, dest uint32) {
 		path := g.ShortestPath(start, dest, false)
 		//fmt.Println(start, dest, path)
-
-		path = g.ShortestPath(52, 158, false)
-
-		if ! reflect.DeepEqual(path, []uint32{52, 73, 123, 29, 158}) {
-			t.Error(path, "expected to be [52 73 123 29 158]")
+		if len(path) <=0 {
+			t.Errorf("Path of length 0", path)
 		}
 	}
 
-	check(95, 158)
-	check(73, 158)
-	check(123, 158)
+	for i:=0; i < 100000; i++ {
+		check(95, 95)
+		//check(95, 158)
+		//check(73, 158)
+		//check(123, 158)
+	}
+
+	stop = true
+
 }
