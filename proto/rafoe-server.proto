@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package riseandfall;
+
+import "space.proto";
+import "command.proto";
+
+service GameServer {
+    // get all game states streamed
+    rpc Observe(ID) returns (stream Space) {}
+
+    // control one or multiple clients and get the current game state
+    rpc StrategyClient(stream Command) returns (stream Space) {}
+}

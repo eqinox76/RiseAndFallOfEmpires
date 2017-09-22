@@ -2,6 +2,9 @@ syntax = "proto3";
 
 package riseandfall;
 
+message ID{
+	string id = 1;
+}
 
 message Space{
 	map<uint32, Planet> planets = 1;
