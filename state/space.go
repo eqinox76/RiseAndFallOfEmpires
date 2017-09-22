@@ -222,7 +222,7 @@ func NewSpace(empires int) Space {
 	neutralEmpire.Passive = true
 
 	// add planets
-	for i := uint32(0); i < 200; i++ {
+	for i := uint32(0); i < 250; i++ {
 		space.CreatePlanet(neutralEmpire)
 	}
 
