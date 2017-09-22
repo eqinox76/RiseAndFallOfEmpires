@@ -81,14 +81,14 @@ func render(writer *bufio.Writer, space *pb.Space) {
 				connected[other] = make(map[uint32] bool)
 			}
 			connected[other][planet.Id] = true
-			canvas.Line(int(planet.PosX), int(planet.PosY), int(space.Planets[other].PosX), int(space.Planets[other].PosY), "stroke:blue; stroke-width:2; stroke-opacity: 0.2")
+			canvas.Line(int(planet.PosX), int(planet.PosY), int(space.Planets[other].PosX), int(space.Planets[other].PosY), "stroke:white; stroke-width:2; stroke-opacity: 0.4")
 		}
 
 		// render planet
 		color := space.Empires[planet.Empire].Color
 		canvas.Circle(int(planet.PosX), int(planet.PosY), 8, fmt.Sprintf("fill-opacity: %f; fill: %s", planet.Control, color))
 		canvas.Circle(int(planet.PosX), int(planet.PosY), 8, fmt.Sprintf("fill: none; stroke: %s; stroke-width: 4", color))
-		canvas.Circle(int(planet.PosX), int(planet.PosY), 10, fmt.Sprintf("fill: none; stroke: black; stroke-width: 1"))
+		canvas.Circle(int(planet.PosX), int(planet.PosY), 10, fmt.Sprintf("fill: none; stroke: white; stroke-width: 1"))
 
 		//canvas.Text(int(planet.PosX), int(planet.PosY)-25, fmt.Sprint(planet.Id), "text-anchor:middle;font-size:10px;fill:blue")
 
@@ -97,7 +97,7 @@ func render(writer *bufio.Writer, space *pb.Space) {
 			// show control
 			// canvas.Text(int(planet.PosX), int(planet.PosY)+20, fmt.Sprint("Control:", planet.Control), "text-anchor:middle;font-size:10px;fill:green")
 			// show ships
-			canvas.Text(int(planet.PosX), int(planet.PosY)-15, fmt.Sprint(len(fleets[planet.Empire])), "text-anchor:middle;font-size:12px;stroke:black;stroke-width:0.25;fill:" + color)
+			canvas.Text(int(planet.PosX), int(planet.PosY)-15, fmt.Sprint(len(fleets[planet.Empire])), "text-anchor:middle;font-size:12px;stroke:white;stroke-width:0.5;fill:" + color)
 		}
 
 
@@ -141,7 +141,7 @@ func menuViewer(writer http.ResponseWriter, request *http.Request) {
 
 </head>
 
-<body>
+<body style="background-color:Black">
 
 <div id="space" />
 

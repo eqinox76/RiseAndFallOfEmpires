@@ -39,14 +39,16 @@ func main() {
 		}
 		wg.Add(1)
 		clientChannels[id] = make(chan *pb.Space, 20)
-		ki := rand.Intn(3)
+		ki := rand.Intn(4)
 		switch ki {
 		case 0:
+			fallthrough
+		case 1:
 			d := simple.Distributed{}
 			go ControlLoop(id, d.DistributeStrategy, clientChannels[id], doneChannel, responseChannel)
-		case 1:
-			go ControlLoop(id, simple.RandomStrategy, clientChannels[id], doneChannel, responseChannel)
 		case 2:
+			go ControlLoop(id, simple.RandomStrategy, clientChannels[id], doneChannel, responseChannel)
+		case 3:
 			go ControlLoop(id, special.FergsnStrategy, clientChannels[id], doneChannel, responseChannel)
 		}
 	}
