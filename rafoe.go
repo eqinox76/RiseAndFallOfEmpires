@@ -5,19 +5,72 @@ import (
 	"github.com/eqinox76/RiseAndFallOfEmpires/state"
 	"github.com/eqinox76/RiseAndFallOfEmpires/engine"
 	"net"
-	"os"
 	"sync"
 	"time"
 	"math/rand"
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/grpc"
 	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
-	"encoding/binary"
 	"flag"
+	"log"
 )
 
-type Client struct {
-	output chan []byte
+type clientConn struct {
+	output chan *pb.Space
 	Done   bool
+}
+
+type gameServer struct {
+	clients []clientConn
+	mutex   sync.Mutex
+}
+
+func (server *gameServer) Observe(id *pb.ID, client pb.GameServer_ObserveServer) error {
+	log.Println("Client",client.Context(),"connected")
+	// register us for the game states
+	channel := make(chan *pb.Space)
+	c := clientConn{channel, false}
+	server.mutex.Lock()
+	server.clients = append(server.clients, c)
+	server.mutex.Unlock()
+
+	defer func() { c.Done = true }()
+	for space := range channel {
+		err := client.Send(space)
+		if err != nil {
+			return err
+		}
+	}
+	log.Println(len(channel), "The channel for this client has been closed")
+	return nil
+}
+
+func (server *gameServer) StrategyClient(stream pb.GameServer_StrategyClientServer) error {
+	return nil
+}
+
+func (server *gameServer) fanOut(input chan *pb.Space) {
+	for msg := range input {
+
+		removed := 0
+		server.mutex.Lock()
+		for i, client := range server.clients {
+			if client.Done {
+				// this worker is done so close it
+				close(client.output)
+				server.clients[i] = server.clients[removed]
+				removed++
+			} else {
+				client.output <- msg
+				//fmt.Println(w, len(w.output), len(fanOut))
+			}
+		}
+
+		if removed > 0 {
+			server.clients = server.clients[removed:]
+		}
+
+		server.mutex.Unlock()
+	}
 }
 
 var maxWaitForCommands = flag.Int("maxWaitForCommands", 1000, "max time we wait for all clients to send commands in ms")
@@ -27,90 +80,39 @@ func main() {
 	flag.Parse()
 
 	space := state.NewSpace(9)
-	fanOut := make(chan []byte)
+	fanOut := make(chan *pb.Space)
 	commands := make(chan *pb.Command)
 	defer close(fanOut)
 
-	workers := make([]*Client, 0)
-	mutex := sync.Mutex{}
+	lis, err := net.Listen("tcp", ":9076")
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+	// TODO do we need to secure the local connection?
+	grpc.WithInsecure()
 
-	// start server port listener
+	grpcServer := grpc.NewServer()
+	server := gameServer{}
+	pb.RegisterGameServerServer(grpcServer, &server)
 	go func() {
-		// Listen for incoming connections.
-		l, err := net.Listen("tcp", "localhost:9076")
-		if err != nil {
-			fmt.Println("Error listening:", err.Error())
-			os.Exit(1)
-		}
-
-		defer l.Close()
-		fmt.Println("Listening on localhost:9076")
-
-		// forever accept new connections
-		for {
-			con, err := l.Accept()
-			if err != nil {
-				fmt.Println("Error accepting: ", err.Error())
-				os.Exit(1)
-			}
-
-			mutex.Lock()
-
-			client := Client{output: make(chan []byte)}
-			workers = append(workers, &client)
-
-			mutex.Unlock()
-			fmt.Println("New client", client)
-			// and start the client
-			go forward_game_state(con, &client)
-			go process_commands(con, &client, commands)
-		}
+		grpcServer.Serve(lis)
 	}()
 
 	// start fan out
-	go func() {
-		for msg := range fanOut {
+	go server.fanOut(fanOut)
 
-			removed := 0
-			mutex.Lock()
-			for i, w := range workers {
-
-				if w.Done {
-					// this worker is done so close it
-					close(w.output)
-					workers[i] = workers[removed]
-					fmt.Println(w, " removed")
-					removed++
-				} else {
-					w.output <- msg
-					//fmt.Println(w, len(w.output), len(fanOut))
-				}
-			}
-
-			if removed > 0 {
-				workers = workers[removed:]
-			}
-
-			mutex.Unlock()
-		}
-	}()
-
-	// compute game state forever
+	// compute game state until the game is done
 	for ! space.Won() {
 		start := time.Now()
 		engine.Step(&space)
 
-		bytes, err := state.Serialize(&space)
-		if err != nil {
-			panic(err)
-		}
 		//fmt.Printf("serialize: %d, Planets: %d Ships: %d\n", len(bytes), len(space.Planets), len(space.Ships))
-		fanOut <- bytes
+		fanOut <- &space.Space
 		fmt.Println(time.Now().Sub(start))
 
 		commandsReceived := make(map[uint32]bool)
 		// scan for the commands. After that compute the next state
-		for len(commandsReceived) != len(space.Empires) - 1 && start.Add(time.Duration(*maxWaitForCommands) * time.Millisecond).After(time.Now()) {
+		for len(commandsReceived) != len(space.Empires)-1 && start.Add(time.Duration(*maxWaitForCommands) * time.Millisecond).After(time.Now()) {
 			select {
 			case cmd := <-commands:
 				engine.ProcessCommand(&space, cmd)
@@ -121,55 +123,55 @@ func main() {
 			}
 		}
 	}
-
-}
-func process_commands(conn net.Conn, client *Client, commands chan *pb.Command) {
-
-	for {
-		header := make([]byte, 4)
-		_, err := conn.Read(header)
-
-		if err != nil {
-			fmt.Println(err)
-			conn.Close()
-			client.Done = true
-			return
-		}
-
-		l := binary.LittleEndian.Uint32(header)
-
-		msgbuffer := make([]byte, l)
-		_, err = conn.Read(msgbuffer)
-		if err != nil {
-			fmt.Println(err)
-			conn.Close()
-			client.Done = true
-			return
-		}
-
-		command := pb.Command{}
-		err = proto.Unmarshal(msgbuffer, &command)
-		if err != nil {
-			fmt.Println(err)
-			conn.Close()
-			client.Done = true
-			return
-		}
-
-		commands <- &command
-	}
 }
 
-func forward_game_state(con net.Conn, worker *Client) {
-	for msg := range worker.output {
-
-		con.SetWriteDeadline(time.Now().Add(150 * time.Millisecond))
-		_, err := con.Write(msg)
-
-		if err != nil {
-			fmt.Println(worker, " closed due to ", err)
-			break
-		}
-	}
-	worker.Done = true
-}
+//func process_commands(conn net.Conn, client *Client, commands chan *pb.Command) {
+//
+//	for {
+//		header := make([]byte, 4)
+//		_, err := conn.Read(header)
+//
+//		if err != nil {
+//			fmt.Println(err)
+//			conn.Close()
+//			client.Done = true
+//			return
+//		}
+//
+//		l := binary.LittleEndian.Uint32(header)
+//
+//		msgbuffer := make([]byte, l)
+//		_, err = conn.Read(msgbuffer)
+//		if err != nil {
+//			fmt.Println(err)
+//			conn.Close()
+//			client.Done = true
+//			return
+//		}
+//
+//		command := pb.Command{}
+//		err = proto.Unmarshal(msgbuffer, &command)
+//		if err != nil {
+//			fmt.Println(err)
+//			conn.Close()
+//			client.Done = true
+//			return
+//		}
+//
+//		commands <- &command
+//	}
+//}
+//
+//func forward_game_state(con net.Conn, worker *Client) {
+//	for msg := range worker.output {
+//
+//		con.SetWriteDeadline(time.Now().Add(150 * time.Millisecond))
+//		_, err := con.Write(msg)
+//
+//		if err != nil {
+//			fmt.Println(worker, " closed due to ", err)
+//			break
+//		}
+//	}
+//	worker.Done = true
+//}

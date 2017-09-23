@@ -12,9 +12,12 @@ import (
 	"math/rand"
 	"math"
 	"github.com/eqinox76/RiseAndFallOfEmpires/state"
-	"github.com/eqinox76/RiseAndFallOfEmpires/client"
+	"google.golang.org/grpc"
 	"sort"
 	"strings"
+	"log"
+	"golang.org/x/net/context"
+	"io"
 )
 
 var registered []chan []byte
@@ -31,14 +34,27 @@ func main() {
 	}()
 
 	// connect to the server and render the gamestate forever
-	c := client.Client{}
+	conn, err := grpc.Dial("localhost:9076", grpc.WithInsecure())
+	if err != nil {
+		panic(err)
+	}
+	defer conn.Close()
+
+	c := pb.NewGameServerClient(conn)
+
+	stream, err := c.Observe(context.Background(), &pb.ID{})
+	if err != nil {
+		panic(err)
+	}
 
 	for {
-		space, err := c.PollState()
-		if err != nil{
-			fmt.Errorf("%s while reading new state", err)
-			time.Sleep(1 * time.Second)
-			continue
+		space, err := stream.Recv()
+		if err == io.EOF {
+			log.Println("Server closed connection")
+			break
+		} else if err != nil {
+			log.Printf("%s while reading new state\n", err)
+			break
 		}
 
 		var b bytes.Buffer
@@ -65,20 +81,20 @@ func render(writer *bufio.Writer, space *pb.Space) {
 
 	canvas := svg.New(writer)
 	canvas.Start(width, height)
-	connected := make(map[uint32] map[uint32] bool)
-	for _, planet := range space.Planets{
+	connected := make(map[uint32]map[uint32]bool)
+	for _, planet := range space.Planets {
 		// render connection
 		connected_ids := connected[planet.Id]
 		for _, other := range planet.Connected {
-			if connected_ids[other]{
+			if connected_ids[other] {
 				// already painted from the other side
 				continue
 			}
 
 			// mark as painted
 			_, ok := connected[other]
-			if !ok{
-				connected[other] = make(map[uint32] bool)
+			if !ok {
+				connected[other] = make(map[uint32]bool)
 			}
 			connected[other][planet.Id] = true
 			canvas.Line(int(planet.PosX), int(planet.PosY), int(space.Planets[other].PosX), int(space.Planets[other].PosY), "stroke:white; stroke-width:2; stroke-opacity: 0.4")
@@ -97,11 +113,10 @@ func render(writer *bufio.Writer, space *pb.Space) {
 			// show control
 			// canvas.Text(int(planet.PosX), int(planet.PosY)+20, fmt.Sprint("Control:", planet.Control), "text-anchor:middle;font-size:10px;fill:green")
 			// show ships
-			canvas.Text(int(planet.PosX), int(planet.PosY)-15, fmt.Sprint(len(fleets[planet.Empire])), "text-anchor:middle;font-size:12px;stroke:white;stroke-width:0.5;fill:" + color)
+			canvas.Text(int(planet.PosX), int(planet.PosY)-15, fmt.Sprint(len(fleets[planet.Empire])), "text-anchor:middle;font-size:12px;stroke:white;stroke-width:0.5;fill:"+color)
 		}
 
-
-		if len(fleets) > 1{
+		if len(fleets) > 1 {
 			var text []string
 			for key, value := range fleets {
 				text = append(text, fmt.Sprintf("%s: %d", space.Empires[key].Color, len(value)))
@@ -112,19 +127,18 @@ func render(writer *bufio.Writer, space *pb.Space) {
 
 		// show at most 50 ships
 		counter := 0
-		for ship, _ := range planet.Orbiting{
-			if counter > 50{
+		for ship, _ := range planet.Orbiting {
+			if counter > 50 {
 				break
 			}
 			counter++
 			degree := 2 * math.Pi * rand.Float64()
-			canvas.Circle(int(float64(planet.PosX) + (14 * math.Sin(degree))),
-				int(float64(planet.PosY) + (14 * math.Cos(degree))),
+			canvas.Circle(int(float64(planet.PosX)+(14*math.Sin(degree))),
+				int(float64(planet.PosY)+(14*math.Cos(degree))),
 				1,
 				fmt.Sprintf("stroke: %s; stroke-width: 1", space.Empires[space.Ships[ship].Empire].Color))
 		}
 	}
-
 
 	canvas.Text(0, 10, fmt.Sprintf("Created: %s", time.Now()), "font-size:10px")
 
@@ -187,7 +201,7 @@ func worldViewer(writer http.ResponseWriter, request *http.Request) {
 	writer.Header().Set("Content-Type", "image/svg+xml")                        // set the content-type header
 	writer.Header().Set("Cache-Control", "no-cache, must-revalidate, no-store") // force no cache
 
-	data := <- c
+	data := <-c
 	writer.Write(data)
 
 }

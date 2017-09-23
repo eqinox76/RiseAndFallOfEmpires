@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package riseandfall;
 
-import "space.proto";
-import "command.proto";
+import "proto/space.proto";
+import "proto/command.proto";
 
 service GameServer {
     // get all game states streamed
