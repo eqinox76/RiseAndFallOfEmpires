@@ -11,10 +11,9 @@ import (
 func Step(space *state.Space) {
 	for _, planet := range space.Planets {
 
-		computeProduction(space, planet)
-		computeControl(planet)
+		computeControl(space, planet)
 		computeFight(space, planet)
-		computeOwner(space, planet)
+		computeProduction(space, planet)
 	}
 
 	for _, empire := range space.Empires{
@@ -34,7 +33,7 @@ func computeProduction(space *state.Space, planet *pb.Planet) {
 		// check if the empire can have a new ship
 		e := space.Empires[planet.Empire]
 
-		if (len(e.Planets) * 100) > len(e.Ships) {
+		if math.Sqrt(float64(len(e.Planets))) * 100 > float64(len(e.Ships)) {
 			space.CreateShip(planet, e)
 		}
 	}
@@ -50,29 +49,6 @@ func ProcessCommand(space *state.Space, command *pb.Command) {
 				space.MoveShip(order.Move.Ship, order.Move.Start, order.Move.Destination)
 			}
 		}
-	}
-}
-
-func computeOwner(space *state.Space, planet *pb.Planet) {
-	fleets := state.GetFleets(space.Ships, planet)
-	_, fleet_exists := fleets[planet.Empire]
-	if fleet_exists {
-		// this planet has a defending fleet
-		return
-	}
-
-	if len(fleets) > 1 {
-		// this planet is still being fought over
-		return
-	}
-
-	for id := range fleets {
-		old_owner := space.Empires[planet.Empire]
-		delete(old_owner.Planets, planet.Id)
-		new_owner := space.Empires[id]
-		new_owner.Planets[planet.Id] = true
-		planet.Empire = id
-		planet.Control = 0.
 	}
 }
 
@@ -103,16 +79,36 @@ func computeFight(space *state.Space, planet *pb.Planet) {
 	}
 }
 
-func computeControl(planet *pb.Planet) {
-	if planet.Control != 1 {
-		if planet.Control > 0.999 {
-			planet.Control = 1
-		} else if planet.Control <= 0 {
-			planet.Control = 0.001
-		} else if planet.Control > 0.5 {
-			planet.Control = planet.Control + (rand.Float32() * 0.1 * (1 - planet.Control))
-		} else {
-			planet.Control = planet.Control + (rand.Float32() * 0.1 * (planet.Control))
+func computeControl(space *state.Space, planet *pb.Planet) {
+	fleets := state.GetFleets(space.Ships, planet)
+	_, ownFleetPresent := fleets[planet.Empire]
+
+	// if no one or only the controlling empire is present control increases
+	if len(planet.Orbiting) == 0 || (ownFleetPresent && len(fleets) == 1){
+		if planet.Control != 1 {
+			if planet.Control > 0.999 {
+				planet.Control = 1
+			} else if planet.Control <= 0 {
+				planet.Control = 0.001
+			} else if planet.Control > 0.5 {
+				planet.Control = planet.Control + (rand.Float32() * 0.1 * (1 - planet.Control))
+			} else {
+				planet.Control = planet.Control + (rand.Float32() * 0.1 * (planet.Control))
+			}
+		}
+	} else {
+		// else control decreases
+		planet.Control -= float32(len(planet.Orbiting)) * 0.001
+
+		// if the control is to low and there is only one enemy fleet it takes over
+		if planet.Control < 0 && len(fleets) == 1{
+			planet.Control = 0
+			for empire, _ := range fleets{
+				delete(space.Empires[planet.Empire].Planets, planet.Id)
+				planet.Empire = empire
+				space.Empires[empire].Planets[planet.Id] = true
+			}
+
 		}
 	}
 }

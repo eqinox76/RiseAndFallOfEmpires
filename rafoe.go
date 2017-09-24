@@ -109,7 +109,7 @@ func (server *gameServer) fanOut(input chan *pb.Space) {
 	}
 }
 
-var maxWaitForCommands = flag.Int("maxWaitForCommands", 200, "max time we wait for all clients to send commands in ms")
+var maxWaitForCommands = flag.Int("maxWaitForCommands", 2000, "max time we wait for all clients to send commands in ms")
 
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano())

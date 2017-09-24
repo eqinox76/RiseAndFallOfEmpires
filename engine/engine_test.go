@@ -106,7 +106,7 @@ func TestCreateAndDestroy(t *testing.T) {
 	space.RemoveShip(s2)
 	space.RemoveShip(s3)
 	s5 := space.CreateShip(p, space.Empires[p.Empire])
-	for k, _ := range space.Ships{
+	for k, _ := range space.Ships {
 		fmt.Print(k, "|")
 	}
 
@@ -116,7 +116,7 @@ func TestCreateAndDestroy(t *testing.T) {
 	}
 
 	s2 = space.CreateShip(p, space.Empires[p.Empire])
-	for k, _ := range space.Ships{
+	for k, _ := range space.Ships {
 		fmt.Print(k, "|")
 	}
 	if s1.Id == s2.Id ||
@@ -125,7 +125,7 @@ func TestCreateAndDestroy(t *testing.T) {
 		t.Error(s1, s2, s3, s4, s5)
 	}
 	s3 = space.CreateShip(p, space.Empires[p.Empire])
-	for k, _ := range space.Ships{
+	for k, _ := range space.Ships {
 		fmt.Print(k, "|")
 	}
 	if s1.Id == s3.Id ||
@@ -164,5 +164,66 @@ func TestMoveAndFight(t *testing.T) {
 			fmt.Println(id, len(fleet))
 		}
 		fmt.Println("==", p1.Empire, "==")
+	}
+}
+
+func TestControl(t *testing.T) {
+	rand.Seed(int64(time.Now().Second()))
+
+	space := state.EmptySpace()
+
+	e1 := space.CreateEmpire()
+	p := space.CreatePlanet(e1)
+	p.Control = 0.5
+
+	Step(&space)
+	if p.Control <= 0.5 {
+		t.Errorf("Control did not increase %s", p)
+	}
+
+	for i := 0; i < 10; i ++ {
+		space.CreateShip(p, e1)
+	}
+
+	old := p.Control
+	Step(&space)
+	if p.Control <= old {
+		t.Errorf("Control did not increase %s", p)
+	}
+}
+
+func TestInvade(t *testing.T) {
+	rand.Seed(int64(time.Now().Second()))
+
+	space := state.EmptySpace()
+
+	e1 := space.CreateEmpire()
+	e2 := space.CreateEmpire()
+	e3 := space.CreateEmpire()
+	p := space.CreatePlanet(e1)
+	p.Control = 0.5
+	for i := 0; i < 10; i ++ {
+		space.CreateShip(p, e2)
+	}
+
+	space.CreateShip(p, e3)
+
+	Step(&space)
+	if p.Control >= 0.5 {
+		t.Errorf("Control did not decrease %s", p)
+	}
+
+	counter := 0
+	for p.Empire == e1.Id {
+		Step(&space)
+		counter++
+	}
+
+	if p.Empire != e2.Id{
+		t.Errorf("planet did not change owner %s", p)
+	}
+
+	if counter < 10 {
+		t.Errorf("planet changed owner to fast %s %d", p ,counter)
 	}
 }
