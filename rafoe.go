@@ -26,6 +26,7 @@ type gameServer struct {
 	mutex    sync.Mutex
 	commands chan *pb.Command
 	space    *state.Space
+	started  bool
 }
 
 func (server *gameServer) addClient() *clientConn {
@@ -59,6 +60,7 @@ func (server *gameServer) CurrentGameState(ctx context.Context, id *pb.ID) (*pb.
 }
 
 func (server *gameServer) StrategyClient(stream pb.GameServer_StrategyClientServer) error {
+	server.started = true
 	log.Println("Strategy", stream.Context(), "connected")
 	// register us for the game states
 	c := server.addClient()
@@ -109,7 +111,7 @@ func (server *gameServer) fanOut(input chan *pb.Space) {
 	}
 }
 
-var maxWaitForCommands = flag.Int("maxWaitForCommands", 2000, "max time we wait for all clients to send commands in ms")
+var maxWaitForCommands = flag.Int("maxWaitForCommands", 500, "max time we wait for all clients to send commands in ms")
 
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
@@ -141,7 +143,9 @@ func main() {
 	// compute game state until the game is done
 	for ! server.space.Won() {
 		start := time.Now()
-		engine.Step(server.space)
+		if server.started {
+			engine.Step(server.space)
+		}
 
 		//fmt.Printf("serialize: %d, Planets: %d Ships: %d\n", len(bytes), len(space.Planets), len(space.Ships))
 		fanOut <- &server.space.Space
@@ -149,7 +153,7 @@ func main() {
 
 		//we need to deepcopy state.Space because the deserialization by grpc and this step computation may interleave
 		space, ok := deepcopy.Copy(server.space).(*state.Space)
-		if !ok{
+		if !ok {
 			panic(space)
 		}
 		server.space = space
