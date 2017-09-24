@@ -7,6 +7,9 @@ import proto "github.com/gogo/protobuf/proto"
 import fmt "fmt"
 import math "math"
 
+import strings "strings"
+import reflect "reflect"
+
 import io "io"
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -20,7 +23,6 @@ type Command struct {
 }
 
 func (m *Command) Reset()                    { *m = Command{} }
-func (m *Command) String() string            { return proto.CompactTextString(m) }
 func (*Command) ProtoMessage()               {}
 func (*Command) Descriptor() ([]byte, []int) { return fileDescriptorCommand, []int{0} }
 
@@ -45,12 +47,12 @@ type Command_Order struct {
 }
 
 func (m *Command_Order) Reset()                    { *m = Command_Order{} }
-func (m *Command_Order) String() string            { return proto.CompactTextString(m) }
 func (*Command_Order) ProtoMessage()               {}
 func (*Command_Order) Descriptor() ([]byte, []int) { return fileDescriptorCommand, []int{0, 0} }
 
 type isCommand_Order_Order interface {
 	isCommand_Order_Order()
+	Equal(interface{}) bool
 	MarshalTo([]byte) (int, error)
 	Size() int
 }
@@ -137,7 +139,6 @@ type MovementOrder struct {
 }
 
 func (m *MovementOrder) Reset()                    { *m = MovementOrder{} }
-func (m *MovementOrder) String() string            { return proto.CompactTextString(m) }
 func (*MovementOrder) ProtoMessage()               {}
 func (*MovementOrder) Descriptor() ([]byte, []int) { return fileDescriptorCommand, []int{1} }
 
@@ -166,6 +167,199 @@ func init() {
 	proto.RegisterType((*Command)(nil), "riseandfall.Command")
 	proto.RegisterType((*Command_Order)(nil), "riseandfall.Command.Order")
 	proto.RegisterType((*MovementOrder)(nil), "riseandfall.MovementOrder")
+}
+func (this *Command) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*Command)
+	if !ok {
+		that2, ok := that.(Command)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if this.Empire != that1.Empire {
+		return false
+	}
+	if len(this.Orders) != len(that1.Orders) {
+		return false
+	}
+	for i := range this.Orders {
+		if !this.Orders[i].Equal(that1.Orders[i]) {
+			return false
+		}
+	}
+	return true
+}
+func (this *Command_Order) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*Command_Order)
+	if !ok {
+		that2, ok := that.(Command_Order)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if that1.Order == nil {
+		if this.Order != nil {
+			return false
+		}
+	} else if this.Order == nil {
+		return false
+	} else if !this.Order.Equal(that1.Order) {
+		return false
+	}
+	return true
+}
+func (this *Command_Order_Move) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*Command_Order_Move)
+	if !ok {
+		that2, ok := that.(Command_Order_Move)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.Move.Equal(that1.Move) {
+		return false
+	}
+	return true
+}
+func (this *MovementOrder) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*MovementOrder)
+	if !ok {
+		that2, ok := that.(MovementOrder)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if this.Ship != that1.Ship {
+		return false
+	}
+	if this.Start != that1.Start {
+		return false
+	}
+	if this.Destination != that1.Destination {
+		return false
+	}
+	return true
+}
+func (this *Command) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&riseandfall.Command{")
+	s = append(s, "Empire: "+fmt.Sprintf("%#v", this.Empire)+",\n")
+	if this.Orders != nil {
+		s = append(s, "Orders: "+fmt.Sprintf("%#v", this.Orders)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *Command_Order) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&riseandfall.Command_Order{")
+	if this.Order != nil {
+		s = append(s, "Order: "+fmt.Sprintf("%#v", this.Order)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *Command_Order_Move) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&riseandfall.Command_Order_Move{` +
+		`Move:` + fmt.Sprintf("%#v", this.Move) + `}`}, ", ")
+	return s
+}
+func (this *MovementOrder) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 7)
+	s = append(s, "&riseandfall.MovementOrder{")
+	s = append(s, "Ship: "+fmt.Sprintf("%#v", this.Ship)+",\n")
+	s = append(s, "Start: "+fmt.Sprintf("%#v", this.Start)+",\n")
+	s = append(s, "Destination: "+fmt.Sprintf("%#v", this.Destination)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func valueToGoStringCommand(v interface{}, typ string) string {
+	rv := reflect.ValueOf(v)
+	if rv.IsNil() {
+		return "nil"
+	}
+	pv := reflect.Indirect(rv).Interface()
+	return fmt.Sprintf("func(v %v) *%v { return &v } ( %#v )", typ, typ, pv)
 }
 func (m *Command) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
@@ -361,6 +555,57 @@ func sovCommand(x uint64) (n int) {
 }
 func sozCommand(x uint64) (n int) {
 	return sovCommand(uint64((x << 1) ^ uint64((int64(x) >> 63))))
+}
+func (this *Command) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&Command{`,
+		`Empire:` + fmt.Sprintf("%v", this.Empire) + `,`,
+		`Orders:` + strings.Replace(fmt.Sprintf("%v", this.Orders), "Command_Order", "Command_Order", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *Command_Order) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&Command_Order{`,
+		`Order:` + fmt.Sprintf("%v", this.Order) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *Command_Order_Move) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&Command_Order_Move{`,
+		`Move:` + strings.Replace(fmt.Sprintf("%v", this.Move), "MovementOrder", "MovementOrder", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *MovementOrder) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&MovementOrder{`,
+		`Ship:` + fmt.Sprintf("%v", this.Ship) + `,`,
+		`Start:` + fmt.Sprintf("%v", this.Start) + `,`,
+		`Destination:` + fmt.Sprintf("%v", this.Destination) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func valueToStringCommand(v interface{}) string {
+	rv := reflect.ValueOf(v)
+	if rv.IsNil() {
+		return "nil"
+	}
+	pv := reflect.Indirect(rv).Interface()
+	return fmt.Sprintf("*%v", pv)
 }
 func (m *Command) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
@@ -759,20 +1004,22 @@ var (
 func init() { proto.RegisterFile("proto/command.proto", fileDescriptorCommand) }
 
 var fileDescriptorCommand = []byte{
-	// 230 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0x12, 0x2e, 0x28, 0xca, 0x2f,
-	0xc9, 0xd7, 0x4f, 0xce, 0xcf, 0xcd, 0x4d, 0xcc, 0x4b, 0xd1, 0x03, 0xf3, 0x84, 0xb8, 0x8b, 0x32,
-	0x8b, 0x53, 0x13, 0xf3, 0x52, 0xd2, 0x12, 0x73, 0x72, 0x94, 0x66, 0x32, 0x72, 0xb1, 0x3b, 0x43,
-	0xa4, 0x85, 0xc4, 0xb8, 0xd8, 0x52, 0x73, 0x0b, 0x32, 0x8b, 0x52, 0x25, 0x18, 0x15, 0x18, 0x35,
-	0x78, 0x83, 0xa0, 0x3c, 0x21, 0x23, 0x2e, 0xb6, 0xfc, 0xa2, 0x94, 0xd4, 0xa2, 0x62, 0x09, 0x26,
-	0x05, 0x66, 0x0d, 0x6e, 0x23, 0x29, 0x3d, 0x24, 0x13, 0xf4, 0xa0, 0xba, 0xf5, 0xfc, 0x41, 0x4a,
-	0x82, 0xa0, 0x2a, 0xa5, 0x9c, 0xb8, 0x58, 0xc1, 0x02, 0x42, 0x06, 0x5c, 0x2c, 0xb9, 0xf9, 0x65,
-	0xa9, 0x12, 0xcc, 0x0a, 0x8c, 0x18, 0x5a, 0x7d, 0xf3, 0xcb, 0x52, 0x73, 0x53, 0xf3, 0x4a, 0xc0,
-	0x2a, 0x3d, 0x18, 0x82, 0xc0, 0x2a, 0x9d, 0xd8, 0xb9, 0x58, 0xc1, 0x86, 0x28, 0x45, 0x73, 0xf1,
-	0xa2, 0xa8, 0x10, 0x12, 0xe2, 0x62, 0x29, 0xce, 0xc8, 0x2c, 0x00, 0x3b, 0x8f, 0x25, 0x08, 0xcc,
-	0x16, 0x12, 0xe1, 0x62, 0x2d, 0x2e, 0x49, 0x2c, 0x2a, 0x91, 0x60, 0x02, 0xbb, 0x19, 0xc2, 0x11,
-	0x52, 0xe0, 0xe2, 0x4e, 0x49, 0x2d, 0x2e, 0xc9, 0xcc, 0x4b, 0x2c, 0xc9, 0xcc, 0xcf, 0x03, 0x5b,
-	0xce, 0x1b, 0x84, 0x2c, 0xe4, 0xc4, 0x73, 0xe2, 0x91, 0x1c, 0xe3, 0x85, 0x47, 0x72, 0x8c, 0x0f,
-	0x1e, 0xc9, 0x31, 0x26, 0xb1, 0x81, 0x83, 0xc6, 0x18, 0x10, 0x00, 0x00, 0xff, 0xff, 0xdf, 0x45,
-	0xac, 0x5a, 0x31, 0x01, 0x00, 0x00,
+	// 264 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x64, 0x90, 0x31, 0x4e, 0xc3, 0x30,
+	0x18, 0x85, 0xf3, 0xb7, 0x49, 0x2a, 0xfd, 0x51, 0x16, 0x83, 0x50, 0xd4, 0xe1, 0x57, 0xd4, 0xa9,
+	0x03, 0x0a, 0xa8, 0xdc, 0x20, 0x2c, 0x2c, 0x08, 0x29, 0x2b, 0x53, 0x20, 0x46, 0x44, 0x6a, 0xec,
+	0xc8, 0xb6, 0x3a, 0x73, 0x04, 0x56, 0x6e, 0xc0, 0x51, 0x18, 0x3b, 0x32, 0x12, 0xb3, 0x30, 0xf6,
+	0x08, 0x88, 0xbf, 0x19, 0x8a, 0xba, 0xf9, 0x3d, 0x7f, 0xef, 0xf9, 0xc9, 0x78, 0xd2, 0x1b, 0xed,
+	0xf4, 0xc5, 0xa3, 0xee, 0xba, 0x5a, 0x35, 0x05, 0x2b, 0x91, 0x98, 0xd6, 0xca, 0x5a, 0x35, 0x4f,
+	0xf5, 0x7a, 0xbd, 0x78, 0x03, 0x9c, 0x5d, 0xef, 0xaf, 0xc5, 0x19, 0xc6, 0xb2, 0xeb, 0x5b, 0x23,
+	0x33, 0xc8, 0x61, 0x99, 0x56, 0xa3, 0x12, 0x2b, 0x8c, 0xb5, 0x69, 0xa4, 0xb1, 0xd9, 0x24, 0x9f,
+	0x2e, 0x93, 0xd5, 0xbc, 0x38, 0x68, 0x28, 0xc6, 0x74, 0x71, 0xf7, 0x87, 0x54, 0x23, 0x39, 0x2f,
+	0x31, 0x62, 0x43, 0x5c, 0x62, 0xd8, 0xe9, 0x8d, 0xcc, 0xa6, 0x39, 0x1c, 0x45, 0x6f, 0xf5, 0x46,
+	0x76, 0x52, 0x39, 0x26, 0x6f, 0x82, 0x8a, 0xc9, 0x72, 0x86, 0x11, 0x97, 0x2c, 0xee, 0x31, 0xfd,
+	0x47, 0x08, 0x81, 0xa1, 0x7d, 0x6e, 0x7b, 0x9e, 0x17, 0x56, 0x7c, 0x16, 0xa7, 0x18, 0x59, 0x57,
+	0x1b, 0x97, 0x4d, 0x78, 0xf3, 0x5e, 0x88, 0x1c, 0x93, 0x46, 0x5a, 0xd7, 0xaa, 0xda, 0xb5, 0x5a,
+	0xf1, 0xe3, 0x69, 0x75, 0x68, 0x95, 0xe7, 0xdb, 0x81, 0x82, 0xcf, 0x81, 0x82, 0xdd, 0x40, 0xf0,
+	0xe2, 0x09, 0xde, 0x3d, 0xc1, 0x87, 0x27, 0xd8, 0x7a, 0x82, 0x2f, 0x4f, 0xf0, 0xe3, 0x29, 0xd8,
+	0x79, 0x82, 0xd7, 0x6f, 0x0a, 0x1e, 0x62, 0xfe, 0xba, 0xab, 0xdf, 0x00, 0x00, 0x00, 0xff, 0xff,
+	0xfe, 0x5c, 0xe3, 0x5c, 0x51, 0x01, 0x00, 0x00,
 }

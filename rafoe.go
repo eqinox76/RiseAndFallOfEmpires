@@ -12,6 +12,8 @@ import (
 	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
 	"flag"
 	"log"
+	"context"
+	"github.com/mohae/deepcopy"
 )
 
 type clientConn struct {
@@ -20,31 +22,65 @@ type clientConn struct {
 }
 
 type gameServer struct {
-	clients []clientConn
-	mutex   sync.Mutex
+	clients  []clientConn
+	mutex    sync.Mutex
+	commands chan *pb.Command
+	space    *state.Space
 }
 
-func (server *gameServer) Observe(id *pb.ID, client pb.GameServer_ObserveServer) error {
-	log.Println("Client",client.Context(),"connected")
-	// register us for the game states
+func (server *gameServer) addClient() *clientConn {
 	channel := make(chan *pb.Space)
 	c := clientConn{channel, false}
 	server.mutex.Lock()
 	server.clients = append(server.clients, c)
 	server.mutex.Unlock()
+	return &c
+}
+
+func (server *gameServer) Observe(id *pb.ID, client pb.GameServer_ObserveServer) error {
+	log.Println("Client", client.Context(), "connected")
+	// register us for the game states
+	c := server.addClient()
 
 	defer func() { c.Done = true }()
-	for space := range channel {
+
+	for space := range c.output {
 		err := client.Send(space)
 		if err != nil {
 			return err
 		}
 	}
-	log.Println(len(channel), "The channel for this client has been closed")
+	log.Println("The channel for this client has been closed")
 	return nil
 }
 
+func (server *gameServer) CurrentGameState(ctx context.Context, id *pb.ID) (*pb.Space, error) {
+	return &server.space.Space, nil
+}
+
 func (server *gameServer) StrategyClient(stream pb.GameServer_StrategyClientServer) error {
+	log.Println("Strategy", stream.Context(), "connected")
+	// register us for the game states
+	c := server.addClient()
+
+	go func() {
+		for {
+			cmd, err := stream.Recv()
+			if err != nil {
+				c.Done = true
+				break
+			}
+			server.commands <- cmd
+		}
+	}()
+
+	for space := range c.output {
+		err := stream.Send(space)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -53,14 +89,14 @@ func (server *gameServer) fanOut(input chan *pb.Space) {
 
 		removed := 0
 		server.mutex.Lock()
-		for i, client := range server.clients {
-			if client.Done {
+		for i, c := range server.clients {
+			if c.Done {
 				// this worker is done so close it
-				close(client.output)
+				close(c.output)
 				server.clients[i] = server.clients[removed]
 				removed++
 			} else {
-				client.output <- msg
+				c.output <- msg
 				//fmt.Println(w, len(w.output), len(fanOut))
 			}
 		}
@@ -73,26 +109,27 @@ func (server *gameServer) fanOut(input chan *pb.Space) {
 	}
 }
 
-var maxWaitForCommands = flag.Int("maxWaitForCommands", 1000, "max time we wait for all clients to send commands in ms")
+var maxWaitForCommands = flag.Int("maxWaitForCommands", 200, "max time we wait for all clients to send commands in ms")
 
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
 	flag.Parse()
 
-	space := state.NewSpace(9)
 	fanOut := make(chan *pb.Space)
-	commands := make(chan *pb.Command)
+
 	defer close(fanOut)
 
 	lis, err := net.Listen("tcp", ":9076")
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
-	// TODO do we need to secure the local connection?
-	grpc.WithInsecure()
 
 	grpcServer := grpc.NewServer()
-	server := gameServer{}
+	startPoint := state.NewSpace(9)
+	server := gameServer{
+		commands: make(chan *pb.Command),
+		space:    &startPoint,
+	}
 	pb.RegisterGameServerServer(grpcServer, &server)
 	go func() {
 		grpcServer.Serve(lis)
@@ -102,76 +139,32 @@ func main() {
 	go server.fanOut(fanOut)
 
 	// compute game state until the game is done
-	for ! space.Won() {
+	for ! server.space.Won() {
 		start := time.Now()
-		engine.Step(&space)
+		engine.Step(server.space)
 
 		//fmt.Printf("serialize: %d, Planets: %d Ships: %d\n", len(bytes), len(space.Planets), len(space.Ships))
-		fanOut <- &space.Space
+		fanOut <- &server.space.Space
 		fmt.Println(time.Now().Sub(start))
+
+		//we need to deepcopy state.Space because the deserialization by grpc and this step computation may interleave
+		space, ok := deepcopy.Copy(server.space).(*state.Space)
+		if !ok{
+			panic(space)
+		}
+		server.space = space
 
 		commandsReceived := make(map[uint32]bool)
 		// scan for the commands. After that compute the next state
-		for len(commandsReceived) != len(space.Empires)-1 && start.Add(time.Duration(*maxWaitForCommands) * time.Millisecond).After(time.Now()) {
+		// check if all empires (minus the passive one) have send a command
+		for len(commandsReceived) != len(server.space.Empires)-1 && start.Add(time.Duration(*maxWaitForCommands) * time.Millisecond).After(time.Now()) {
 			select {
-			case cmd := <-commands:
-				engine.ProcessCommand(&space, cmd)
+			case cmd := <-server.commands:
+				engine.ProcessCommand(server.space, cmd)
 				commandsReceived[cmd.Empire] = true
-				// check if all empires (minus the passive one) have send a command
 			default:
 				time.Sleep(5 * time.Millisecond)
 			}
 		}
 	}
 }
-
-//func process_commands(conn net.Conn, client *Client, commands chan *pb.Command) {
-//
-//	for {
-//		header := make([]byte, 4)
-//		_, err := conn.Read(header)
-//
-//		if err != nil {
-//			fmt.Println(err)
-//			conn.Close()
-//			client.Done = true
-//			return
-//		}
-//
-//		l := binary.LittleEndian.Uint32(header)
-//
-//		msgbuffer := make([]byte, l)
-//		_, err = conn.Read(msgbuffer)
-//		if err != nil {
-//			fmt.Println(err)
-//			conn.Close()
-//			client.Done = true
-//			return
-//		}
-//
-//		command := pb.Command{}
-//		err = proto.Unmarshal(msgbuffer, &command)
-//		if err != nil {
-//			fmt.Println(err)
-//			conn.Close()
-//			client.Done = true
-//			return
-//		}
-//
-//		commands <- &command
-//	}
-//}
-//
-//func forward_game_state(con net.Conn, worker *Client) {
-//	for msg := range worker.output {
-//
-//		con.SetWriteDeadline(time.Now().Add(150 * time.Millisecond))
-//		_, err := con.Write(msg)
-//
-//		if err != nil {
-//			fmt.Println(worker, " closed due to ", err)
-//			break
-//		}
-//	}
-//	worker.Done = true
-//}

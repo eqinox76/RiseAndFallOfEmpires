@@ -51,6 +51,12 @@
 			"revisionTime": "2017-08-16T00:15:14Z"
 		},
 		{
+			"checksumSHA1": "SshnwGo3w3gUaXIswP3/vOQp57k=",
+			"path": "github.com/mohae/deepcopy",
+			"revision": "491d3605edfb866af34a48075bd4355ac1bf46ca",
+			"revisionTime": "2017-06-03T00:54:31Z"
+		},
+		{
 			"checksumSHA1": "rJab1YdNhQooDiBWNnt7TLWPyBU=",
 			"path": "github.com/pkg/errors",
 			"revision": "c605e284fe17294bda444b34710735b29d1a9d90",
