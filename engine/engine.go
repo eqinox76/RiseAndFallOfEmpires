@@ -13,29 +13,36 @@ func Step(space *state.Space) {
 
 		computeControl(space, planet)
 		computeFight(space, planet)
-		computeProduction(space, planet)
 	}
 
-	for _, empire := range space.Empires{
-		if len(empire.Planets) + len(empire.Ships) == 0{
+	for _, empire := range space.Empires {
+		// compute production for not passice empires
+		// a empire can at most produce the
+		if !empire.Passive {
+			var totalControl float64 = 0.
+			for planet, _ := range empire.Planets {
+				totalControl += float64(space.Planets[planet].Control)
+			}
+
+			for planet, _ := range empire.Planets {
+				if len(empire.Ships) > int(math.Sqrt(totalControl) * 100) {
+					break
+				}
+				computeProduction(space, space.Planets[planet])
+			}
+
+		}
+		if len(empire.Planets)+len(empire.Ships) == 0 {
 			delete(space.Empires, empire.Id)
 		}
 	}
 	return
 }
 func computeProduction(space *state.Space, planet *pb.Planet) {
-	if space.Empires[planet.Empire].Passive {
-		// this empire produces nothing
-		return
-	}
-
 	if rand.Float32() <= planet.Control {
-		// check if the empire can have a new ship
 		e := space.Empires[planet.Empire]
 
-		if math.Sqrt(float64(len(e.Planets))) * 100 > float64(len(e.Ships)) {
-			space.CreateShip(planet, e)
-		}
+		space.CreateShip(planet, e)
 	}
 }
 
@@ -84,7 +91,7 @@ func computeControl(space *state.Space, planet *pb.Planet) {
 	_, ownFleetPresent := fleets[planet.Empire]
 
 	// if no one or only the controlling empire is present control increases
-	if len(planet.Orbiting) == 0 || (ownFleetPresent && len(fleets) == 1){
+	if len(planet.Orbiting) == 0 || (ownFleetPresent && len(fleets) == 1) {
 		if planet.Control != 1 {
 			if planet.Control > 0.999 {
 				planet.Control = 1
@@ -98,12 +105,12 @@ func computeControl(space *state.Space, planet *pb.Planet) {
 		}
 	} else {
 		// else control decreases
-		planet.Control -= float32(len(planet.Orbiting)) * 0.001
+		planet.Control -= float32(len(planet.Orbiting)) * 0.0001
 
 		// if the control is to low and there is only one enemy fleet it takes over
-		if planet.Control < 0 && len(fleets) == 1{
+		if planet.Control < 0 && len(fleets) == 1 {
 			planet.Control = 0
-			for empire, _ := range fleets{
+			for empire, _ := range fleets {
 				delete(space.Empires[planet.Empire].Planets, planet.Id)
 				planet.Empire = empire
 				space.Empires[empire].Planets[planet.Id] = true
