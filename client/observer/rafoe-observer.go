@@ -126,7 +126,6 @@ func render(writer *bufio.Writer, space *pb.Space) {
 			}
 			sort.Sort(empires)
 
-			fmt.Print(empires, fleets)
 			for _, eId := range empires {
 				empire := space.Empires[uint32(eId)]
 				fleet := fleets[uint32(eId)]
