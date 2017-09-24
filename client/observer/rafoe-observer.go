@@ -13,11 +13,11 @@ import (
 	"math"
 	"github.com/eqinox76/RiseAndFallOfEmpires/state"
 	"google.golang.org/grpc"
-	"sort"
-	"strings"
 	"log"
 	"golang.org/x/net/context"
 	"io"
+	v "github.com/eqinox76/RiseAndFallOfEmpires/vector"
+	"sort"
 )
 
 var registered []chan []byte
@@ -106,23 +106,36 @@ func render(writer *bufio.Writer, space *pb.Space) {
 		canvas.Circle(int(planet.PosX), int(planet.PosY), 8, fmt.Sprintf("fill: none; stroke: %s; stroke-width: 4", color))
 		canvas.Circle(int(planet.PosX), int(planet.PosY), 10, fmt.Sprintf("fill: none; stroke: white; stroke-width: 1"))
 
+		// id
 		//canvas.Text(int(planet.PosX), int(planet.PosY)-25, fmt.Sprint(planet.Id), "text-anchor:middle;font-size:10px;fill:blue")
 
 		fleets := state.GetFleets(space.Ships, planet)
-		if planet.Empire != 0 {
-			// show control
-			// canvas.Text(int(planet.PosX), int(planet.PosY)+20, fmt.Sprint("Control:", planet.Control), "text-anchor:middle;font-size:10px;fill:green")
-			// show ships
-			canvas.Text(int(planet.PosX), int(planet.PosY)-15, fmt.Sprint(len(fleets[planet.Empire])), "text-anchor:middle;font-size:12px;stroke:white;stroke-width:0.5;fill:"+color)
-		}
-
-		if len(fleets) > 1 {
-			var text []string
-			for key, value := range fleets {
-				text = append(text, fmt.Sprintf("%s: %d", space.Empires[key].Color, len(value)))
+		if len(fleets) == 1 {
+			for empire, fleet := range fleets {
+				if ! space.Empires[empire].Passive {
+					canvas.Text(int(planet.PosX), int(planet.PosY)-20, fmt.Sprint(len(fleet)), "text-anchor:middle;dominant-baseline;font-size:12px;stroke:white;stroke-width:0.5;fill:"+space.Empires[empire].Color)
+				}
 			}
-			sort.Strings(text)
-			canvas.Text(int(planet.PosX), int(planet.PosY)-25, strings.Join(text, ", "), "text-anchor:middle;font-size:10px;fill:green")
+		} else {
+			center := v.Vec{float64(planet.PosX), float64(planet.PosY)}
+			nextDegree := 0.
+			// more than one fleet. compute the position and rotation
+			empires := sort.IntSlice{}
+			for e, _ := range fleets {
+				empires = append(empires, int(e))
+			}
+			sort.Sort(empires)
+
+			fmt.Print(empires, fleets)
+			for _, eId := range empires {
+				empire := space.Empires[uint32(eId)]
+				fleet := fleets[uint32(eId)]
+				pos := center.MoveDegree(nextDegree, 20)
+
+				canvas.Text(int(pos.X), int(pos.Y), fmt.Sprint(len(fleet)), fmt.Sprintf("text-anchor:middle;dominant-baseline:central;font-size:12px;stroke:white;stroke-width:0.5;fill:%s", empire.Color))
+
+				nextDegree += float64(360 / len(fleets))
+			}
 		}
 
 		// show at most 50 ships
@@ -140,7 +153,8 @@ func render(writer *bufio.Writer, space *pb.Space) {
 		}
 	}
 
-	canvas.Text(0, 10, fmt.Sprintf("Created: %s", time.Now()), "font-size:10px")
+	canvas.Text(0, 10, fmt.Sprintf("Created: %s", time.Now()), "font-size:10px;fill:green")
+	canvas.Text(0, 20, fmt.Sprintf("Round: %d", space.Round), "font-size:10px;fill:green")
 
 	canvas.End()
 	writer.Flush()

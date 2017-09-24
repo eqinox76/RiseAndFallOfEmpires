@@ -2,6 +2,8 @@ package vector
 
 import (
 	"testing"
+	"math"
+	"fmt"
 )
 
 func TestAverage(t *testing.T) {
@@ -11,4 +13,8 @@ func TestAverage(t *testing.T) {
 	if a.Dist(b) != 1 {
 		t.Error("Expected 1, got ", a.Dist(b))
 	}
+}
+
+func TestDegree(t *testing.T){
+	fmt.Println(math.Cos(90 ))
 }

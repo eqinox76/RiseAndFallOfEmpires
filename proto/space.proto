@@ -12,6 +12,7 @@ message Space{
 	map<uint32, Empire> empires = 3;
     uint32 width = 4;
     uint32 height = 5;
+	uint64 round = 6;
 }
 
 message Planet{

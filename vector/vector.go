@@ -7,16 +7,18 @@ type Vec struct {
 	Y float64
 }
 
+const degToRad = math.Pi / 180.
+
 func (vec Vec) Norm() float64 {
 	return math.Sqrt(vec.Dot(vec))
 }
 
-func (a Vec) Dot(b Vec) float64 {
-	return a.X*b.X + a.Y*b.Y
+func (vec Vec) Dot(b Vec) float64 {
+	return vec.X*b.X + vec.Y*b.Y
 }
 
-func (a Vec) Dist(b Vec) float64 {
-	return a.Minus(b).Norm()
+func (vec Vec) Dist(b Vec) float64 {
+	return vec.Minus(b).Norm()
 }
 
 func (vec Vec) Plus(vec2 Vec) Vec {
@@ -31,4 +33,20 @@ func (vec Vec) Minus(vec2 Vec) Vec {
 		X: vec.X - vec2.X,
 		Y: vec.Y - vec2.Y,
 	}
+}
+
+func (vec Vec) Mult(dist float64) Vec {
+	return Vec{
+		X: vec.X * dist,
+		Y: vec.Y * dist,
+	}
+}
+
+func (vec Vec) MoveDegree(degree float64, distance float64) Vec{
+	direction := Vec{
+		X: distance * math.Sin(degree * degToRad),
+		Y: distance * math.Cos(degree * degToRad),
+	}
+
+	return vec.Plus(direction)
 }

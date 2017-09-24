@@ -9,6 +9,7 @@ import (
 )
 
 func Step(space *state.Space) {
+	space.Round++
 	for _, planet := range space.Planets {
 
 		computeControl(space, planet)
