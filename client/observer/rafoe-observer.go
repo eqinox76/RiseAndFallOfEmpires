@@ -60,9 +60,7 @@ func main() {
 		var b bytes.Buffer
 		writer := bufio.NewWriter(&b)
 
-		start := time.Now()
 		render(writer, space)
-		fmt.Println(time.Now().Sub(start))
 
 		mux.Lock()
 		for _, c := range registered {
@@ -97,7 +95,12 @@ func render(writer *bufio.Writer, space *pb.Space) {
 				connected[other] = make(map[uint32]bool)
 			}
 			connected[other][planet.Id] = true
-			canvas.Line(int(planet.PosX), int(planet.PosY), int(space.Planets[other].PosX), int(space.Planets[other].PosY), "stroke:white; stroke-width:2; stroke-opacity: 0.4")
+			empire := space.Empires[planet.Empire]
+			if planet.Empire == space.Planets[other].Empire && ! empire.Passive {
+				canvas.Line(int(planet.PosX), int(planet.PosY), int(space.Planets[other].PosX), int(space.Planets[other].PosY), fmt.Sprintf("stroke:white; stroke-width:2; stroke-opacity: 0.4; stroke: %s", empire.Color))
+			} else {
+				canvas.Line(int(planet.PosX), int(planet.PosY), int(space.Planets[other].PosX), int(space.Planets[other].PosY), "stroke:white; stroke-width:2; stroke-opacity: 0.4")
+			}
 		}
 
 		// render planet
@@ -117,11 +120,14 @@ func render(writer *bufio.Writer, space *pb.Space) {
 				}
 			}
 		} else {
-			center := v.Vec{float64(planet.PosX), float64(planet.PosY)}
+			center := v.Vec{
+				X: float64(planet.PosX),
+				Y: float64(planet.PosY),
+			}
 			nextDegree := 0.
 			// more than one fleet. compute the position and rotation
 			empires := sort.IntSlice{}
-			for e, _ := range fleets {
+			for e := range fleets {
 				empires = append(empires, int(e))
 			}
 			sort.Sort(empires)
@@ -139,7 +145,7 @@ func render(writer *bufio.Writer, space *pb.Space) {
 
 		// show at most 50 ships
 		counter := 0
-		for ship, _ := range planet.Orbiting {
+		for ship := range planet.Orbiting {
 			if counter > 50 {
 				break
 			}
@@ -159,7 +165,7 @@ func render(writer *bufio.Writer, space *pb.Space) {
 	writer.Flush()
 }
 
-func menuViewer(writer http.ResponseWriter, request *http.Request) {
+func menuViewer(writer http.ResponseWriter, _ *http.Request) {
 	data := `<html>
 
 <head>
@@ -205,7 +211,7 @@ window.requestAnimationFrame(update);
 	writer.Write([]byte(data))
 }
 
-func worldViewer(writer http.ResponseWriter, request *http.Request) {
+func worldViewer(writer http.ResponseWriter, _ *http.Request) {
 	c := make(chan []byte)
 	mux.Lock()
 	registered = append(registered, c)
@@ -215,6 +221,7 @@ func worldViewer(writer http.ResponseWriter, request *http.Request) {
 	writer.Header().Set("Cache-Control", "no-cache, must-revalidate, no-store") // force no cache
 
 	data := <-c
+	fmt.Println(len(data), "bytes svg send")
 	writer.Write(data)
 
 }

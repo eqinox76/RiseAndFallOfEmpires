@@ -106,7 +106,7 @@ func computeControl(space *state.Space, planet *pb.Planet) {
 		}
 	} else {
 		// else control decreases
-		planet.Control -= float32(len(planet.Orbiting)) * 0.0001
+		planet.Control -= float32(len(planet.Orbiting)) * 0.0005
 
 		// if the control is to low and there is only one enemy fleet it takes over
 		if planet.Control < 0 && len(fleets) == 1 {
