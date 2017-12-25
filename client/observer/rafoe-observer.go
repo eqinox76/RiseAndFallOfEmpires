@@ -55,6 +55,7 @@ func main() {
 		err := binary.Read(reader, binary.LittleEndian, &l)
 		if err != nil {
 			fmt.Println("could not read length:", err)
+			break
 		}
 		fmt.Println("going to read", l, "bytes of data")
 		data := make([]byte, l, l)
@@ -121,7 +122,7 @@ func render(writer *bufio.Writer, space *pb.Space) {
 		if len(fleets) == 1 {
 			for empire, fleet := range fleets {
 				if !space.Empires[empire].Passive {
-					canvas.Text(int(planet.PosX), int(planet.PosY)-20, fmt.Sprint(len(fleet)), "text-anchor:middle;dominant-baseline;font-size:12px;stroke:white;stroke-width:0.5;fill:"+space.Empires[empire].Color)
+					canvas.Text(int(planet.PosX), int(planet.PosY)-25, fmt.Sprint(len(fleet)), fmt.Sprintf("text-anchor:middle;dominant-baseline;font-size:16px;stroke:%s;fill:%s", space.Empires[empire].Color, space.Empires[empire].Color))
 				}
 			}
 		} else {
@@ -140,9 +141,9 @@ func render(writer *bufio.Writer, space *pb.Space) {
 			for _, eId := range empires {
 				empire := space.Empires[uint32(eId)]
 				fleet := fleets[uint32(eId)]
-				pos := center.MoveDegree(nextDegree, 20)
+				pos := center.MoveDegree(nextDegree, 25)
 
-				canvas.Text(int(pos.X), int(pos.Y), fmt.Sprint(len(fleet)), fmt.Sprintf("text-anchor:middle;dominant-baseline:central;font-size:12px;stroke:white;stroke-width:0.5;fill:%s", empire.Color))
+				canvas.Text(int(pos.X), int(pos.Y), fmt.Sprint(len(fleet)), fmt.Sprintf("text-anchor:middle;dominant-baseline:central;font-size:16px;stroke:%s;fill:%s", empire.Color, empire.Color))
 
 				nextDegree += float64(360 / len(fleets))
 			}
