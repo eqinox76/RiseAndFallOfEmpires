@@ -24,6 +24,7 @@ message Planet{
 	float control = 6;
 	uint32 empire = 7;
     repeated uint32 connected = 8;
+	float production = 9;
 
 }
 

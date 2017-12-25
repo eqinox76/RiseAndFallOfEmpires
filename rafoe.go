@@ -13,6 +13,7 @@ import (
 	"github.com/eqinox76/RiseAndFallOfEmpires/engine"
 	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
 	"github.com/eqinox76/RiseAndFallOfEmpires/state"
+	"github.com/gogo/protobuf/proto"
 	"github.com/mohae/deepcopy"
 )
 
@@ -70,7 +71,7 @@ func main() {
 		//fmt.Printf("serialize: %d, Planets: %d Ships: %d\n", len(bytes), len(space.Planets), len(space.Ships))
 		stateChannel <- &server.space.Space
 
-		data, err := space.Space.Marshal()
+		data, err := proto.Marshal(&space.Space)
 		err = binary.Write(writer, binary.LittleEndian, uint32(len(data)))
 		if err != nil {
 			panic(err)

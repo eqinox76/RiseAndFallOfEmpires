@@ -18,7 +18,10 @@ func Step(space *state.Space) {
 	}
 
 	for _, empire := range space.Empires {
-		// compute production for not passive empires
+
+		if len(empire.Planets)+len(empire.Ships) == 0 {
+			delete(space.Empires, empire.Id)
+		}
 
 		if empire.Passive {
 			continue
@@ -37,16 +40,19 @@ func Step(space *state.Space) {
 
 		prod := math.Ceil(math.Log2(float64(len(fullPlanets))) + 0.1)
 
-		// a empire can at most produce 100 divisions per fully controlled planet
+		// a empire can at most produce sqrt(100 divisions per fully controlled planet)
 		prod = math.Min(prod, (math.Sqrt(totalControl)*100)-float64(len(empire.Ships)))
 
 		for ; prod > 0; prod-- {
-			space.CreateShip(fullPlanets[rand.Intn(len(fullPlanets))], empire)
+			pl := fullPlanets[rand.Intn(len(fullPlanets))]
+			if pl.Production > 0.9 {
+				space.CreateShip(pl, empire)
+				pl.Production = 0
+			} else {
+				pl.Production += 0.1
+			}
 		}
 
-		if len(empire.Planets)+len(empire.Ships) == 0 {
-			delete(space.Empires, empire.Id)
-		}
 	}
 	return
 }
@@ -123,6 +129,7 @@ func computeControl(space *state.Space, planet *pb.Planet) {
 		// if the control is too low and there is only one enemy fleet it takes over
 		if planet.Control < 0.05 && len(fleets) == 1 {
 			planet.Control = 0
+			planet.Production = 0
 			for empire, _ := range fleets {
 				delete(space.Empires[planet.Empire].Planets, planet.Id)
 				planet.Empire = empire
@@ -133,7 +140,7 @@ func computeControl(space *state.Space, planet *pb.Planet) {
 }
 
 func computeDamage(ships int, target int) int {
-	const prob float64 = 0.05
+	const prob float64 = 0.2
 	var deviation float64 = math.Sqrt(float64(ships) * prob * (1 - prob))
 	var destroyed float64 = rand.NormFloat64()*deviation + (float64(ships) * prob)
 

@@ -1,9 +1,10 @@
 package simple
 
 import (
+	"math"
+
 	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
 	"github.com/eqinox76/RiseAndFallOfEmpires/state"
-	"math"
 )
 
 type Distributed struct {
@@ -28,18 +29,18 @@ func (dist *Distributed) DistributeStrategy(space *pb.Space, planet *pb.Planet, 
 		fleets := state.GetFleets(space.Ships, space.Planets[p_id])
 		own_fleet, ok := fleets[empire]
 
-		if space.Planets[p_id].Empire != empire || len(fleets) > 1 || !ok {
+		if space.Planets[p_id].Empire != empire {
 			// enemies present
 
 			// remember which neighbor is the weakest
-			if !ok {
-				// that target has none of our ships. send all there
+			ships := len(space.Planets[p_id].Orbiting)
+			if !ok && ships < lowest_neighbor_ships {
+				// that target has none of our ships.
 				lowest_neighbor = p_id
-				lowest_neighbor_ships = 0
-				break
-			} else if lowest_neighbor_ships > len(own_fleet) {
-				lowest_neighbor_ships = len(own_fleet)
+				lowest_neighbor_ships = ships
+			} else if lowest_neighbor_ships > ships-len(own_fleet) {
 				lowest_neighbor = p_id
+				lowest_neighbor_ships = ships - len(own_fleet)
 			}
 		}
 	}
@@ -47,13 +48,14 @@ func (dist *Distributed) DistributeStrategy(space *pb.Space, planet *pb.Planet, 
 	if lowest_neighbor_ships != math.MaxInt32 {
 		// if we have more ships send them to the neighbor
 		my_ships, ok := state.GetFleets(space.Ships, planet)[empire]
-		if !ok || len(my_ships) < lowest_neighbor_ships {
+		if !ok ||
+			len(my_ships) < int(float32(lowest_neighbor_ships)*1.5) {
 			return
 		}
 
-		amount_to_sent := ((len(my_ships) + lowest_neighbor_ships) / 2) - lowest_neighbor_ships
+		amount_to_sent := int(float32(len(my_ships)) * 0.8)
 		//fmt.Print(" my ships:", len(my_ships), " to send:", amount_to_sent)
-		for count := 0; count < amount_to_sent; count ++ {
+		for count := 0; count < amount_to_sent; count++ {
 			order := pb.MovementOrder{
 				Ship:        my_ships[count].Id,
 				Start:       planet.Id,
@@ -70,10 +72,16 @@ func (dist *Distributed) DistributeStrategy(space *pb.Space, planet *pb.Planet, 
 	}
 
 	if len(fleets) == 1 {
-		// there are no bordering enemy planets. Send the whole fleet in the direction of trouble
+		// there are no bordering enemy planets. Send 2/3 fleet in the direction of trouble
 		var target_id uint32
 		dist.graph.Visit(planet.Id, func(n state.Node) bool {
 			if n.Planet.Empire != empire {
+				target_id = n.Planet.Id
+				return false
+			}
+			fleets := state.GetFleets(space.Ships, n.Planet)
+			delete(fleets, empire)
+			if len(fleets) > 0 {
 				target_id = n.Planet.Id
 				return false
 			}
@@ -81,11 +89,11 @@ func (dist *Distributed) DistributeStrategy(space *pb.Space, planet *pb.Planet, 
 		})
 
 		target := dist.graph.ShortestPath(planet.Id, target_id, true)
-		if len(target) < 2{
+		if len(target) < 2 {
 			return
 		}
 
-		for count := 0; count < (len(own_fleet) * 2 / 3.); count ++ {
+		for count := 0; count < int(math.Ceil(float64(len(own_fleet))*2/3.)); count++ {
 			order := pb.MovementOrder{
 				Ship:        own_fleet[count].Id,
 				Start:       planet.Id,

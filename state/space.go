@@ -234,6 +234,7 @@ func NewSpace(empires int) Space {
 		p.Empire = e.Id
 		e.Planets[p.Id] = true
 		p.Control = 1
+		p.Production = 0
 	}
 
 	space.Graph = NewGraph(space.Planets)
