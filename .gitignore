@@ -16,5 +16,8 @@
 .idea/
 *.iml
 
-#binary files
+# binary files
 rafoe
+
+# temporary files
+*.tmp

@@ -1,36 +1,15 @@
-package main
+package strategyclient
 
 import (
-	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
+	"fmt"
+	"math/rand"
+
 	"github.com/eqinox76/RiseAndFallOfEmpires/client/simple"
 	"github.com/eqinox76/RiseAndFallOfEmpires/client/special"
-	"fmt"
-	_ "net/http/pprof"
-	"log"
-	"net/http"
-	"google.golang.org/grpc"
-	"math/rand"
-	"context"
+	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
 )
 
-func main() {
-	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
-
-	// connect to the server and render the gamestate forever
-	conn, err := grpc.Dial("localhost:9076", grpc.WithInsecure())
-	if err != nil {
-		panic(err)
-	}
-	defer conn.Close()
-
-	c := pb.NewGameServerClient(conn)
-	space, err := c.CurrentGameState(context.Background(), &pb.ID{})
-
-	if err != nil {
-		panic(err)
-	}
+func RunClients(space *pb.Space, input chan *pb.Space, commands chan *pb.Command) {
 
 	clientChannels := make(map[uint32]chan *pb.Space, 0)
 	// TODO need to close the channel when the empire has lost
@@ -56,27 +35,14 @@ func main() {
 		}
 	}
 
-	stream, err := c.StrategyClient(context.Background())
-
-	defer stream.CloseSend()
-
 	// send commands
 	go func() {
 		for response := range responseChannel {
-			err := stream.SendMsg(response)
-			if err != nil {
-				fmt.Println(err)
-			}
+			commands <- response
 		}
 	}()
 
-	for {
-		space, err := stream.Recv()
-
-		if err != nil {
-			log.Println("While reading new state:", err)
-			break
-		}
+	for space := range input {
 
 		for _, c := range clientChannels {
 			c <- space

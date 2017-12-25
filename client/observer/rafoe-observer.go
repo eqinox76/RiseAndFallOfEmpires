@@ -1,30 +1,34 @@
 package main
 
 import (
-	"net/http"
-	"github.com/ajstarks/svgo"
-	"fmt"
-	"time"
-	"bytes"
 	"bufio"
-	"sync"
-	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
-	"math/rand"
-	"math"
-	"github.com/eqinox76/RiseAndFallOfEmpires/state"
-	"google.golang.org/grpc"
-	"log"
-	"golang.org/x/net/context"
+	"bytes"
+	"compress/gzip"
+	"encoding/binary"
+	"flag"
+	"fmt"
 	"io"
-	v "github.com/eqinox76/RiseAndFallOfEmpires/vector"
+	"math"
+	"math/rand"
+	"net/http"
+	"os"
 	"sort"
+	"time"
+
+	"github.com/ajstarks/svgo"
+	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
+	"github.com/eqinox76/RiseAndFallOfEmpires/state"
+	v "github.com/eqinox76/RiseAndFallOfEmpires/vector"
+	"github.com/gogo/protobuf/proto"
 )
 
-var registered []chan []byte
-var mux sync.Mutex
+var path = flag.String("path", "state.tmp", "state which will be read")
+
+var picture []byte = nil
 
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
+	flag.Parse()
 
 	// start server
 	go func() {
@@ -33,28 +37,41 @@ func main() {
 		http.ListenAndServe(":8079", nil)
 	}()
 
-	// connect to the server and render the gamestate forever
-	conn, err := grpc.Dial("localhost:9076", grpc.WithInsecure())
+	f, err := os.Open(*path)
 	if err != nil {
 		panic(err)
 	}
-	defer conn.Close()
 
-	c := pb.NewGameServerClient(conn)
+	defer f.Close()
 
-	stream, err := c.Observe(context.Background(), &pb.ID{})
+	reader, err := gzip.NewReader(f)
 	if err != nil {
 		panic(err)
 	}
 
 	for {
-		space, err := stream.Recv()
-		if err == io.EOF {
-			log.Println("Server closed connection")
-			break
-		} else if err != nil {
-			log.Printf("%s while reading new state\n", err)
-			break
+
+		// wait until the last picture has been requested
+		for picture != nil {
+			time.Sleep(5 * time.Millisecond)
+		}
+
+		var l uint32
+		err := binary.Read(reader, binary.LittleEndian, &l)
+		if err != nil {
+			fmt.Println("could not read length:", err)
+		}
+		fmt.Println("going to read", l, "bytes of data")
+		data := make([]byte, l, l)
+		_, err = io.ReadFull(reader, data)
+		if err != nil {
+			panic(err)
+		}
+
+		space := &pb.Space{}
+		err = proto.Unmarshal(data, space)
+		if err != nil {
+			panic(err)
 		}
 
 		var b bytes.Buffer
@@ -62,14 +79,7 @@ func main() {
 
 		render(writer, space)
 
-		mux.Lock()
-		for _, c := range registered {
-			data := b.Bytes()
-			c <- data
-			close(c)
-		}
-		registered = nil
-		mux.Unlock()
+		picture = b.Bytes()
 	}
 }
 
@@ -96,7 +106,7 @@ func render(writer *bufio.Writer, space *pb.Space) {
 			}
 			connected[other][planet.Id] = true
 			empire := space.Empires[planet.Empire]
-			if planet.Empire == space.Planets[other].Empire && ! empire.Passive {
+			if planet.Empire == space.Planets[other].Empire && !empire.Passive {
 				canvas.Line(int(planet.PosX), int(planet.PosY), int(space.Planets[other].PosX), int(space.Planets[other].PosY), fmt.Sprintf("stroke:white; stroke-width:2; stroke-opacity: 0.4; stroke: %s", empire.Color))
 			} else {
 				canvas.Line(int(planet.PosX), int(planet.PosY), int(space.Planets[other].PosX), int(space.Planets[other].PosY), "stroke:white; stroke-width:2; stroke-opacity: 0.4")
@@ -115,7 +125,7 @@ func render(writer *bufio.Writer, space *pb.Space) {
 		fleets := state.GetFleets(space.Ships, planet)
 		if len(fleets) == 1 {
 			for empire, fleet := range fleets {
-				if ! space.Empires[empire].Passive {
+				if !space.Empires[empire].Passive {
 					canvas.Text(int(planet.PosX), int(planet.PosY)-20, fmt.Sprint(len(fleet)), "text-anchor:middle;dominant-baseline;font-size:12px;stroke:white;stroke-width:0.5;fill:"+space.Empires[empire].Color)
 				}
 			}
@@ -212,16 +222,16 @@ window.requestAnimationFrame(update);
 }
 
 func worldViewer(writer http.ResponseWriter, _ *http.Request) {
-	c := make(chan []byte)
-	mux.Lock()
-	registered = append(registered, c)
-	mux.Unlock()
+
+	for picture == nil {
+		time.Sleep(500 * time.Millisecond)
+	}
 
 	writer.Header().Set("Content-Type", "image/svg+xml")                        // set the content-type header
 	writer.Header().Set("Cache-Control", "no-cache, must-revalidate, no-store") // force no cache
 
-	data := <-c
-	fmt.Println(len(data), "bytes svg send")
-	writer.Write(data)
+	fmt.Println(len(picture), "bytes svg send")
+	writer.Write(picture)
+	picture = nil
 
 }
