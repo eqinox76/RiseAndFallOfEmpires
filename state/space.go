@@ -233,7 +233,7 @@ func NewSpace(empires int) Space {
 		p := space.Planets[uint32(rand.Int()%(len(space.Planets)))]
 		p.Empire = e.Id
 		e.Planets[p.Id] = true
-		p.Control = 0.5
+		p.Control = 1
 	}
 
 	space.Graph = NewGraph(space.Planets)

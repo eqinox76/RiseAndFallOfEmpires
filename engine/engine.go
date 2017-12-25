@@ -1,11 +1,12 @@
 package engine
 
 import (
+	"math"
+	"math/rand"
+
+	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
 	"github.com/eqinox76/RiseAndFallOfEmpires/state"
 	"github.com/eqinox76/RiseAndFallOfEmpires/util"
-	"math/rand"
-	"math"
-	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
 )
 
 func Step(space *state.Space) {
@@ -17,34 +18,37 @@ func Step(space *state.Space) {
 	}
 
 	for _, empire := range space.Empires {
-		// compute production for not passice empires
-		// a empire can at most produce the
-		if !empire.Passive {
-			var totalControl float64 = 0.
-			for planet, _ := range empire.Planets {
-				totalControl += float64(space.Planets[planet].Control)
-			}
+		// compute production for not passive empires
 
-			for planet, _ := range empire.Planets {
-				if len(empire.Ships) > int(math.Sqrt(totalControl) * 100) {
-					break
-				}
-				computeProduction(space, space.Planets[planet])
-			}
-
+		if empire.Passive {
+			continue
 		}
+
+		var totalControl float64 = 0.
+		fullPlanets := make([]*pb.Planet, 0)
+
+		for planet, _ := range empire.Planets {
+			pl := space.Planets[planet]
+			totalControl += float64(pl.Control)
+			if pl.Control == 1 {
+				fullPlanets = append(fullPlanets, pl)
+			}
+		}
+
+		prod := math.Ceil(math.Log2(float64(len(fullPlanets))) + 0.1)
+
+		// a empire can at most produce 100 divisions per fully controlled planet
+		prod = math.Min(prod, (math.Sqrt(totalControl)*100)-float64(len(empire.Ships)))
+
+		for ; prod > 0; prod-- {
+			space.CreateShip(fullPlanets[rand.Intn(len(fullPlanets))], empire)
+		}
+
 		if len(empire.Planets)+len(empire.Ships) == 0 {
 			delete(space.Empires, empire.Id)
 		}
 	}
 	return
-}
-func computeProduction(space *state.Space, planet *pb.Planet) {
-	if rand.Float32() <= planet.Control {
-		e := space.Empires[planet.Empire]
-
-		space.CreateShip(planet, e)
-	}
 }
 
 func ProcessCommand(space *state.Space, command *pb.Command) {
@@ -91,32 +95,39 @@ func computeControl(space *state.Space, planet *pb.Planet) {
 	fleets := state.GetFleets(space.Ships, planet)
 	_, ownFleetPresent := fleets[planet.Empire]
 
+	increase := func(control float32) float32 {
+		if control > 0.999 {
+			return 1
+		} else if control <= 0 {
+			return 0.001
+		} else if control > 0.5 {
+			return control + (rand.Float32() * 0.1 * (1 - control))
+		} else {
+			return control + (rand.Float32() * 0.1 * (control))
+		}
+	}
 	// if no one or only the controlling empire is present control increases
 	if len(planet.Orbiting) == 0 || (ownFleetPresent && len(fleets) == 1) {
-		if planet.Control != 1 {
-			if planet.Control > 0.999 {
-				planet.Control = 1
-			} else if planet.Control <= 0 {
-				planet.Control = 0.001
-			} else if planet.Control > 0.5 {
-				planet.Control = planet.Control + (rand.Float32() * 0.1 * (1 - planet.Control))
-			} else {
-				planet.Control = planet.Control + (rand.Float32() * 0.1 * (planet.Control))
-			}
-		}
+		planet.Control = increase(planet.Control)
 	} else {
-		// else control decreases
-		planet.Control -= float32(len(planet.Orbiting)) * 0.0005
+		// adjust control slowly to reflect the fleet strengths
+		targetControl := float32(len(fleets[planet.Empire])) / float32(len(planet.Orbiting))
+		step := planet.Control - targetControl
+		if step > 0 {
+			step *= 0.1
+			planet.Control -= step
+		} else {
+			planet.Control = increase(planet.Control)
+		}
 
-		// if the control is to low and there is only one enemy fleet it takes over
-		if planet.Control < 0 && len(fleets) == 1 {
+		// if the control is too low and there is only one enemy fleet it takes over
+		if planet.Control < 0.05 && len(fleets) == 1 {
 			planet.Control = 0
 			for empire, _ := range fleets {
 				delete(space.Empires[planet.Empire].Planets, planet.Id)
 				planet.Empire = empire
 				space.Empires[empire].Planets[planet.Id] = true
 			}
-
 		}
 	}
 }
