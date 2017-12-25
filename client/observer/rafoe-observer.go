@@ -24,7 +24,7 @@ import (
 
 var path = flag.String("path", "state.tmp", "state which will be read")
 
-var picture []byte = nil
+var picChan = make(chan []byte)
 
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
@@ -51,11 +51,6 @@ func main() {
 
 	for {
 
-		// wait until the last picture has been requested
-		for picture != nil {
-			time.Sleep(5 * time.Millisecond)
-		}
-
 		var l uint32
 		err := binary.Read(reader, binary.LittleEndian, &l)
 		if err != nil {
@@ -79,7 +74,7 @@ func main() {
 
 		render(writer, space)
 
-		picture = b.Bytes()
+		picChan <- b.Bytes()
 	}
 }
 
@@ -223,15 +218,12 @@ window.requestAnimationFrame(update);
 
 func worldViewer(writer http.ResponseWriter, _ *http.Request) {
 
-	for picture == nil {
-		time.Sleep(500 * time.Millisecond)
-	}
+	picture := <-picChan
 
 	writer.Header().Set("Content-Type", "image/svg+xml")                        // set the content-type header
 	writer.Header().Set("Cache-Control", "no-cache, must-revalidate, no-store") // force no cache
 
 	fmt.Println(len(picture), "bytes svg send")
 	writer.Write(picture)
-	picture = nil
 
 }

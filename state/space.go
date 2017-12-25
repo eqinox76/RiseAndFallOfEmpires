@@ -1,16 +1,17 @@
 package state
 
 import (
+	"math/rand"
+
+	"github.com/dhconnelly/rtreego"
 	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
 	v "github.com/eqinox76/RiseAndFallOfEmpires/vector"
 	"github.com/golang/protobuf/proto"
-	"math/rand"
-	"github.com/dhconnelly/rtreego"
 
 	"encoding/binary"
-	"sort"
-	"math"
 	"fmt"
+	"math"
+	"sort"
 )
 
 type Space struct {
@@ -60,9 +61,9 @@ func (p PlanetPos) Bounds() *rtreego.Rect {
 func EmptySpace() Space {
 	space := Space{
 		Space: pb.Space{
-			Width:  1400,
-			Height: 800,
-			Ships: make(map[uint64]*pb.Ship),
+			Width:   1000,
+			Height:  600,
+			Ships:   make(map[uint64]*pb.Ship),
 			Planets: make(map[uint32]*pb.Planet),
 			Empires: make(map[uint32]*pb.Empire),
 		},
@@ -222,14 +223,14 @@ func NewSpace(empires int) Space {
 	neutralEmpire.Passive = true
 
 	// add planets
-	for i := uint32(0); i < 250; i++ {
+	for i := uint32(0); i < 100; i++ {
 		space.CreatePlanet(neutralEmpire)
 	}
 
 	// add empire start planets
 	for ; empires > 0; empires-- {
 		e := space.CreateEmpire()
-		p := space.Planets[uint32(rand.Int() % (len(space.Planets)))]
+		p := space.Planets[uint32(rand.Int()%(len(space.Planets)))]
 		p.Empire = e.Id
 		e.Planets[p.Id] = true
 		p.Control = 0.5
@@ -256,7 +257,7 @@ func NewSpace(empires int) Space {
 	for _, edge := range edges {
 		if space.Graph.GraphSize(root) == len(space.Planets) {
 			// done
-			break;
+			break
 		}
 
 		// add edge
@@ -267,8 +268,8 @@ func NewSpace(empires int) Space {
 
 		// check if cycling
 		if space.Graph.HasCycle(from) {
-			from.Connected = from.Connected[: len(from.Connected)-1]
-			to.Connected = to.Connected[: len(to.Connected)-1]
+			from.Connected = from.Connected[:len(from.Connected)-1]
+			to.Connected = to.Connected[:len(to.Connected)-1]
 		}
 	}
 
@@ -283,16 +284,16 @@ func NewSpace(empires int) Space {
 			nn := space.PlanetTree.NearestNeighbors(size+2, rtreego.Point{float64(planet.PosX), float64(planet.PosY)})
 
 			to, ok := nn[size+1].(*PlanetPos)
-			if ! ok {
+			if !ok {
 				panic(nn[size+1])
 			}
 
 			// check if this edge already exists
 			exists := false
-			for _, id := range planet.Connected{
-				if id == to.Id{
+			for _, id := range planet.Connected {
+				if id == to.Id {
 					exists = true
-					break;
+					break
 				}
 			}
 
@@ -333,8 +334,8 @@ func (space *Space) CreateShip(planet *pb.Planet, empire *pb.Empire) *pb.Ship {
 	}
 
 	space.Ships[id] = &s
-	planet.Orbiting[s.Id] =true
-	empire.Ships[s.Id] =true
+	planet.Orbiting[s.Id] = true
+	empire.Ships[s.Id] = true
 	return &s
 }
 
@@ -348,13 +349,13 @@ func (space *Space) CreateEmpire() *pb.Empire {
 	c := rand.Intn(len(space.freeColors))
 	color := space.freeColors[c]
 	space.freeColors[c] = space.freeColors[len(space.freeColors)-1]
-	space.freeColors = space.freeColors[: len(space.freeColors)-1]
+	space.freeColors = space.freeColors[:len(space.freeColors)-1]
 
 	e := pb.Empire{
-		Id:    id,
-		Color: color,
-		Ships: make(map[uint64] bool),
-		Planets: make(map[uint32] bool),
+		Id:      id,
+		Color:   color,
+		Ships:   make(map[uint64]bool),
+		Planets: make(map[uint32]bool),
 	}
 
 	space.Empires[e.Id] = &e
@@ -399,12 +400,12 @@ func (space *Space) CreatePlanet(empire *pb.Empire) *pb.Planet {
 	}
 
 	planet := pb.Planet{
-		Id:      id,
-		PosX:    x,
-		PosY:    y,
-		Control: rand.Float32(),
-		Empire:  empire.Id,
-		Orbiting: make(map[uint64] bool),
+		Id:       id,
+		PosX:     x,
+		PosY:     y,
+		Control:  rand.Float32(),
+		Empire:   empire.Id,
+		Orbiting: make(map[uint64]bool),
 	}
 
 	empire.Planets[planet.Id] = true
@@ -430,7 +431,7 @@ func GetFleets(global_ships map[uint64]*pb.Ship, planet *pb.Planet) map[uint32][
 	return fleets
 }
 
-func (space *Space) Won() bool{
+func (space *Space) Won() bool {
 	return len(space.Empires) == 2
 }
 
