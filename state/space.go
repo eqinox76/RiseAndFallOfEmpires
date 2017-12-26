@@ -230,7 +230,12 @@ func NewSpace(empires int) Space {
 	// add empire start planets
 	for ; empires > 0; empires-- {
 		e := space.CreateEmpire()
+
 		p := space.Planets[uint32(rand.Int()%(len(space.Planets)))]
+		for p.Empire != 0 {
+			p = space.Planets[uint32(rand.Int()%(len(space.Planets)))]
+		}
+
 		p.Empire = e.Id
 		e.Planets[p.Id] = true
 		p.Control = 1
