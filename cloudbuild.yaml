@@ -10,5 +10,5 @@ steps:
   env: ['PROJECT_ROOT=github.com/eqinox76/RiseAndFallOfEmpires']
 artifacts:
   objects:
-    location: 'gs://[BUCKET_NAME]/'
+    location: 'gs://riseandfallofempires/'
     paths: ['rafoe', 'rafoe-observer']
