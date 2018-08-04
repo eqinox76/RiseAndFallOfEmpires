@@ -34,7 +34,7 @@ func main() {
 	go func() {
 		http.HandleFunc("/space.svg", worldViewer)
 		http.HandleFunc("/main", menuViewer)
-		http.ListenAndServe(":8079", nil)
+		http.ListenAndServe(":80", nil)
 	}()
 
 	f, err := os.Open(*path)
