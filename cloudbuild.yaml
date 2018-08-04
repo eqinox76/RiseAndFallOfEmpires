@@ -2,10 +2,7 @@ steps:
 - name: 'gcr.io/cloud-builders/go'
   args: ['install', '.']
   env: ['PROJECT_ROOT=github.com/eqinox76/RiseAndFallOfEmpires']
-- name: 'gcr.io/cloud-builders/go'
-  args: ['build', 'hello']
-  env: ['PROJECT_ROOT=hello']
 artifacts:
   objects:
     location: 'gs://[BUCKET_NAME]/'
-    paths: ['hello']
+    paths: ['rafoe']
