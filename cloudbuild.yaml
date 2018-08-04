@@ -1,10 +1,7 @@
 steps:
 - name: 'gcr.io/cloud-builders/go'
-  args: ['version']
-  env: ['PROJECT_ROOT=hello']
-- name: 'gcr.io/cloud-builders/go'
   args: ['install', '.']
-  env: ['PROJECT_ROOT=hello']
+  env: ['PROJECT_ROOT=github.com/eqinox76/RiseAndFallOfEmpires']
 - name: 'gcr.io/cloud-builders/go'
   args: ['build', 'hello']
   env: ['PROJECT_ROOT=hello']
