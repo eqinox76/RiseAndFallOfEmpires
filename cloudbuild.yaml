@@ -1,11 +1,11 @@
 steps:
-- name: 'gcr.io/cloud-builders/go'
+- name: 'gcr.io/cloud-builders/go:debian'
   args: ['get', 'google.golang.org/grpc']
   env: ['PROJECT_ROOT=github.com/eqinox76/RiseAndFallOfEmpires']
-- name: 'gcr.io/cloud-builders/go'
+- name: 'gcr.io/cloud-builders/go:deian'
   args: ['build', 'rafoe.go']
   env: ['PROJECT_ROOT=github.com/eqinox76/RiseAndFallOfEmpires']
-- name: 'gcr.io/cloud-builders/go'
+- name: 'gcr.io/cloud-builders/go:debian'
   args: ['build', 'client/observer/rafoe-observer.go']
   env: ['PROJECT_ROOT=github.com/eqinox76/RiseAndFallOfEmpires']
 artifacts:
