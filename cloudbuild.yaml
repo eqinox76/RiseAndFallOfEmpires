@@ -1,5 +1,8 @@
 steps:
 - name: 'gcr.io/cloud-builders/go'
+  args: ['get', 'google.golang.org/grpc']
+  env: ['PROJECT_ROOT=github.com/eqinox76/RiseAndFallOfEmpires']
+- name: 'gcr.io/cloud-builders/go'
   args: ['build', 'rafoe.go']
   env: ['PROJECT_ROOT=github.com/eqinox76/RiseAndFallOfEmpires']
 - name: 'gcr.io/cloud-builders/go'
