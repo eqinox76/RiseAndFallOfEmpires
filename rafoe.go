@@ -22,7 +22,7 @@ type gameServer struct {
 	space    *state.Space
 }
 
-var maxWaitForCommands = flag.Int("maxWaitForCommands", 500, "max time we wait for all clients to send commands in ms")
+var maxWaitForCommands = flag.Int("maxWaitForCommands", 400, "max time we wait for all clients to send commands in ms")
 var path = flag.String("write", "state.tmp", "were to write the data to")
 
 func main() {
