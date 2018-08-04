@@ -67,12 +67,6 @@
 			"path": "golang.org/x/net/context",
 			"revision": "f4c29de78a2a91c00474a2e689954305c350adf9",
 			"revisionTime": "2018-08-01T01:39:56Z"
-		},
-		{
-			"checksumSHA1": "MD5UMVXdtPwOMosWb8v3TN2qbN4=",
-			"path": "google.golang.org/grpc",
-			"revision": "a344a357543ae284f58167a3baea355ce7367c69",
-			"revisionTime": "2018-08-03T16:35:00Z"
 		}
 	],
 	"rootPath": "github.com/eqinox76/RiseAndFallOfEmpires"
