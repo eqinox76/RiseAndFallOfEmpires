@@ -5,6 +5,7 @@ import (
 
 	"github.com/dhconnelly/rtreego"
 	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
+	"github.com/eqinox76/RiseAndFallOfEmpires/util"
 	v "github.com/eqinox76/RiseAndFallOfEmpires/vector"
 	"github.com/golang/protobuf/proto"
 
@@ -21,31 +22,22 @@ type Space struct {
 	freeColors []string
 }
 
-// for now lets just teleport ships
+// MoveFleet for now lets just teleport ships
 func (space *Space) MoveFleet(fleetid uint32, start uint32, destination uint32) {
 	space.Fleets[fleetid].Position = destination
 
-	delete(space.Planets[start].Fleets, fleetid)
-	space.Planets[destination].Fleets.
+	space.Planets[start].Fleets = util.Removeu32(space.Planets[start].Fleets, fleetid)
+	space.Planets[start].Fleets = append(space.Planets[destination].Fleets, fleetid)
 }
 
-func (space *Space) RemoveShip(ship *pb.Ship) {
-	// remove from global ships
-	delete(space.Ships, ship.Id)
-
-	// remove from Planet
-	switch x := ship.GetPosition().(type) {
-	case *pb.Ship_Orbiting:
-		planet := space.Planets[x.Orbiting]
-
-		delete(planet.Orbiting, ship.Id)
-	default:
-		panic(fmt.Sprintf("A destroyed ship is not orbiting a Planet! %T", x))
+// RemoveShip removes a ship. throws if none is available
+func (space *Space) RemoveShip(shiptype uint32, fleetid uint32) {
+	available := space.Fleets[fleetid].Ships[shiptype]
+	if available == 0 {
+		panic(fmt.Sprintf("Cannot remove because fleet %T has no %T!", fleetid, shiptype))
+	} else {
+		space.Fleets[fleetid].Ships[shiptype]--
 	}
-
-	// remove from empire
-	empire := space.Empires[ship.Empire]
-	delete(empire.Ships, ship.Id)
 }
 
 type PlanetPos struct {
@@ -61,7 +53,7 @@ func EmptySpace() Space {
 		Space: pb.Space{
 			Width:   1000,
 			Height:  600,
-			Ships:   make(map[uint64]*pb.Ship),
+			Fleets:  nil,
 			Planets: make(map[uint32]*pb.Planet),
 			Empires: make(map[uint32]*pb.Empire),
 		},
