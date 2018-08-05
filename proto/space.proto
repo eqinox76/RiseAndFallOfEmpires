@@ -24,11 +24,11 @@ message Planet{
 	uint32 id = 2;
 	uint32 pos_x = 3;
 	uint32 pos_y = 4;
-	// map{empireid: fleetid}
-	map<uint32, uint32> fleets = 5;
+	// fleetid
+	repeated uint32 fleets = 5;
 	float control = 6;
 	uint32 empire = 7;
-    repeated uint32 connected = 8;
+	repeated uint32 connected = 8;
 	float production = 9;
 }
 

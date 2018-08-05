@@ -22,13 +22,11 @@ type Space struct {
 }
 
 // for now lets just teleport ships
-func (space *Space) MoveShip(ship uint64, start uint32, destination uint32) {
-	space.Ships[ship].Position = &pb.Ship_Orbiting{
-		Orbiting: destination,
-	}
+func (space *Space) MoveFleet(fleetid uint32, start uint32, destination uint32) {
+	space.Fleets[fleetid].Position = destination
 
-	delete(space.Planets[start].Orbiting, ship)
-	space.Planets[destination].Orbiting[ship] = true
+	delete(space.Planets[start].Fleets, fleetid)
+	space.Planets[destination].Fleets.
 }
 
 func (space *Space) RemoveShip(ship *pb.Ship) {
