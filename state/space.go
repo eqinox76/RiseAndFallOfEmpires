@@ -305,7 +305,8 @@ func NewSpace(empires int) Space {
 		if planet.Empire == 0 {
 			ships := 2 + rand.Intn(8)
 			for ; ships > 0; ships-- {
-				space.CreateShip(planet, space.Empires[0])
+				fleetId := space.createFleet(planet, planet.Empire)
+				space.CreateShip(1, fleetId)
 			}
 		}
 	}
@@ -313,26 +314,8 @@ func NewSpace(empires int) Space {
 	return space
 }
 
-func (space *Space) CreateShip(planet *pb.Planet, empire *pb.Empire) *pb.Ship {
-	id := uint64(len(space.Ships))
-	_, contained := space.Ships[id]
-	for contained {
-		id++
-		_, contained = space.Ships[id]
-	}
-
-	s := pb.Ship{
-		Id:     id,
-		Empire: empire.Id,
-		Position: &pb.Ship_Orbiting{
-			Orbiting: planet.Id,
-		},
-	}
-
-	space.Ships[id] = &s
-	planet.Orbiting[s.Id] = true
-	empire.Ships[s.Id] = true
-	return &s
+func (space *Space) CreateShip(shiptype uint32, fleetid uint32) {
+	space.Fleets[fleetid].Ships[shiptype]++
 }
 
 func (space *Space) CreateEmpire() *pb.Empire {
@@ -350,7 +333,7 @@ func (space *Space) CreateEmpire() *pb.Empire {
 	e := pb.Empire{
 		Id:      id,
 		Color:   color,
-		Ships:   make(map[uint64]bool),
+		Fleets:  make(map[uint32]bool),
 		Planets: make(map[uint32]bool),
 	}
 
