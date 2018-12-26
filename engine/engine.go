@@ -1,52 +1,102 @@
 package engine
 
 import (
+	"github.com/eqinox76/RiseAndFallOfEmpires/commands"
+	"github.com/eqinox76/RiseAndFallOfEmpires/strategies"
+	"log"
 	"math"
 	"math/rand"
+	"reflect"
 
-	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
 	"github.com/eqinox76/RiseAndFallOfEmpires/state"
 	"github.com/eqinox76/RiseAndFallOfEmpires/util"
 )
 
-func Step(space *state.Space) {
-	space.Round++
-	for _, planet := range space.Planets {
+type GameEngine struct {
+	Space  *state.Space
+	strats []strategies.Strategy
+}
 
-		computeControl(space, planet)
-		computeFight(space, planet)
-	}
+func (engine *GameEngine) Init() {
+	engine.strats = make([]strategies.Strategy, len(engine.Space.Empires))
 
-	for _, empire := range space.Empires {
-
-		if len(empire.Planets)+len(empire.Ships) == 0 {
-			delete(space.Empires, empire.Id)
+	for id, empire := range engine.Space.Empires {
+		if empire.Passive {
+			engine.strats[id] = &strategies.NoneStrategy{}
+			continue
 		}
 
+		ki := rand.Intn(2)
+		switch ki {
+		case 0:
+			engine.strats[id] = &strategies.Distributed{}
+		case 1:
+			engine.strats[id] = &strategies.RandomStrategy{}
+		}
+		engine.strats[id].Init(empire)
+	}
+}
+
+func (engine *GameEngine) Step() {
+	engine.Space.Round++
+	for _, planet := range engine.Space.Planets {
+
+		computeControl(planet)
+		engine.computeFight(planet)
+	}
+
+	for i := len(engine.Space.Empires) - 1; i >= 0; i-- {
+		if len(engine.Space.Empires[i].Planets)+len(engine.Space.Empires[i].Fleets) == 0 {
+			// del empire
+			engine.Space.Empires[i] = engine.Space.Empires[len(engine.Space.Empires)-1]
+			engine.Space.Empires = engine.Space.Empires[:len(engine.Space.Empires)-1]
+		}
+	}
+
+	// production
+	for _, empire := range engine.Space.Empires {
 		if empire.Passive {
 			continue
 		}
 
-		var totalControl float64 = 0.
-		fullPlanets := make([]*pb.Planet, 0)
+		totalControl := 0.
+		fullPlanets := make([]*state.Planet, 0)
 
-		for planet, _ := range empire.Planets {
-			pl := space.Planets[planet]
-			totalControl += float64(pl.Control)
-			if pl.Control == 1 {
-				fullPlanets = append(fullPlanets, pl)
+		for _, planet := range empire.Planets {
+			totalControl += float64(planet.Control)
+			if planet.Control == 1 {
+				fullPlanets = append(fullPlanets, planet)
 			}
 		}
 
 		prod := math.Ceil(math.Log2(float64(len(fullPlanets))) + 0.1)
 
+		fleetSize := 0.
+		for _, fleet := range empire.Fleets {
+			fleetSize += float64(fleet.Size())
+		}
+
 		// a empire can at most produce sqrt(100 divisions per fully controlled planet)
-		prod = math.Min(prod, (math.Sqrt(totalControl)*100)-float64(len(empire.Ships)))
+		prod = math.Min(prod, (math.Sqrt(totalControl)*100)-fleetSize)
 
 		for ; prod > 0; prod-- {
 			pl := fullPlanets[rand.Intn(len(fullPlanets))]
 			if pl.Production > 0.9 {
-				space.CreateShip(pl, empire)
+
+				fleet := pl.EmpireFleet(empire)
+				if fleet == nil {
+					fleet = engine.Space.CreateFleet(pl, empire)
+				}
+
+				switch rand.Int31n(3) {
+				case 0:
+					fleet.LightSquads++
+				case 1:
+					fleet.HeavySquads++
+				case 2:
+					fleet.RangedSquads++
+				}
+
 				pl.Production = 0
 			} else {
 				pl.Production += 0.1
@@ -54,51 +104,124 @@ func Step(space *state.Space) {
 		}
 
 	}
+
+	cmds := make([]commands.Command, 0)
+	for _, s := range engine.strats {
+		cmds = append(cmds, s.Commands(engine.Space)...)
+	}
+	for _, cmd := range cmds {
+		processCommand(cmd)
+	}
 	return
 }
 
-func ProcessCommand(space *state.Space, command *pb.Command) {
-	for _, cmd := range command.Orders {
-		switch order := cmd.Order.(type) {
-		case *pb.Command_Order_Move:
-			//validate input
-			_, valid := space.Planets[order.Move.Start].Orbiting[order.Move.Ship]
-			if valid {
-				space.MoveShip(order.Move.Ship, order.Move.Start, order.Move.Destination)
-			}
+func processCommand(command commands.Command) {
+	switch cmd := command.(type) {
+	case commands.MoveCommand:
+		// validate
+
+		if ! command.Validate() {
+			log.Fatal(cmd, "Invalid command")
+		} else {
+			command.Execute()
 		}
+
+	default:
+		log.Fatalln(reflect.TypeOf(command), "not implemented")
 	}
 }
 
-func computeFight(space *state.Space, planet *pb.Planet) {
-	fleets := state.GetFleets(space.Ships, planet)
+func (engine *GameEngine) computeFight(planet *state.Planet) {
+	fleets := make(map[*state.Empire]*state.Fleet)
+	allSize := 0
 
-	if len(fleets) < 2 {
+	for _, fleet := range planet.Fleets {
+		fleets[fleet.Empire] = fleet
+		allSize += fleet.Size()
+	}
+
+	if len(fleets) <= 1 {
 		// at most one empire present
 		return
 	}
 
 	// fight all combinations
-	for target, t_fleet := range fleets {
+	for target, tFleet := range fleets {
 		lost := 0
-		for attacker, a_fleet := range fleets {
+		for attacker, aFleet := range fleets {
 			if target == attacker {
 				continue
 			}
 			// let <ships>/<enemies> fight against that fleet
-			lost += computeDamage(len(a_fleet)/len(fleets), len(t_fleet))
+			lost += computeDamage(aFleet.Size()/(len(fleets)-1), tFleet.Size())
 		}
 
-		lost = util.MinInt(lost, len(t_fleet))
+		lost = util.MinInt(lost, tFleet.Size())
 		for lost > 0 {
-			space.RemoveShip(t_fleet[lost-1])
+			// TODO find a better way to destroy a random ship
+			if tFleet.LightSquads > 0 && tFleet.HeavySquads > 0 && tFleet.RangedSquads > 0 {
+				switch rand.Intn(3) {
+				case 0:
+					tFleet.LightSquads--
+				case 1:
+					tFleet.HeavySquads--
+				case 2:
+					tFleet.RangedSquads--
+				}
+			} else if tFleet.LightSquads > 0 && tFleet.HeavySquads > 0 {
+
+				switch rand.Intn(2) {
+				case 0:
+					tFleet.LightSquads--
+				case 1:
+					tFleet.HeavySquads--
+				}
+			} else if tFleet.LightSquads > 0 && tFleet.RangedSquads > 0 {
+
+				switch rand.Intn(2) {
+				case 0:
+					tFleet.LightSquads--
+				case 1:
+					tFleet.RangedSquads--
+				}
+			} else if tFleet.HeavySquads > 0 && tFleet.RangedSquads > 0 {
+
+				switch rand.Intn(2) {
+				case 0:
+					tFleet.HeavySquads--
+				case 1:
+					tFleet.RangedSquads--
+				}
+			} else if tFleet.LightSquads > 0 {
+				tFleet.LightSquads -= lost
+				lost = 0
+			} else if tFleet.HeavySquads > 0 {
+				tFleet.HeavySquads -= lost
+				lost = 0
+			} else if tFleet.RangedSquads > 0 {
+				tFleet.RangedSquads -= lost
+				lost = 0
+			}
+
 			lost--
+		}
+	}
+
+	// check which fleets did not make it
+	for i := len(planet.Fleets) - 1; i >= 0; i-- {
+		if planet.Fleets[i].Size() == 0 {
+			engine.Space.DestroyFleet(planet.Fleets[i])
 		}
 	}
 }
 
-func computeControl(space *state.Space, planet *pb.Planet) {
-	fleets := state.GetFleets(space.Ships, planet)
+func computeControl(planet *state.Planet) {
+	fleets := make(map[*state.Empire]int)
+
+	for _, fleet := range planet.Fleets {
+		fleets[fleet.Empire] += fleet.Size()
+	}
+
 	_, ownFleetPresent := fleets[planet.Empire]
 
 	increase := func(control float32) float32 {
@@ -113,11 +236,11 @@ func computeControl(space *state.Space, planet *pb.Planet) {
 		}
 	}
 	// if no one or only the controlling empire is present control increases
-	if len(planet.Orbiting) == 0 || (ownFleetPresent && len(fleets) == 1) {
+	if len(planet.Fleets) == 0 || (ownFleetPresent && len(fleets) == 1) {
 		planet.Control = increase(planet.Control)
 	} else {
 		// adjust control slowly to reflect the fleet strengths
-		targetControl := float32(len(fleets[planet.Empire])) / float32(len(planet.Orbiting))
+		targetControl := float32(fleets[planet.Empire]) / float32(len(planet.Fleets))
 		step := planet.Control - targetControl
 		if step > 0 {
 			step *= 0.1
@@ -130,10 +253,17 @@ func computeControl(space *state.Space, planet *pb.Planet) {
 		if planet.Control < 0.05 && len(fleets) == 1 {
 			planet.Control = 0
 			planet.Production = 0
-			for empire, _ := range fleets {
-				delete(space.Empires[planet.Empire].Planets, planet.Id)
+			for empire := range fleets {
+				for i := range planet.Empire.Planets {
+					l := len(planet.Empire.Planets) - 1
+					planet.Empire.Planets[i] = planet.Empire.Planets[l]
+					planet.Empire.Planets = planet.Empire.Planets[:l]
+					break
+				}
+
 				planet.Empire = empire
-				space.Empires[empire].Planets[planet.Id] = true
+				empire.Planets = append(empire.Planets, planet)
+				break
 			}
 		}
 	}
@@ -141,8 +271,8 @@ func computeControl(space *state.Space, planet *pb.Planet) {
 
 func computeDamage(ships int, target int) int {
 	const prob float64 = 0.2
-	var deviation float64 = math.Sqrt(float64(ships) * prob * (1 - prob))
-	var destroyed float64 = rand.NormFloat64()*deviation + (float64(ships) * prob)
+	var deviation = math.Sqrt(float64(ships) * prob * (1 - prob))
+	var destroyed = rand.NormFloat64()*deviation + (float64(ships) * prob)
 
 	if destroyed < 0 {
 		return 0

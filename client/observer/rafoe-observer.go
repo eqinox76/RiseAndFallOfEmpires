@@ -3,28 +3,166 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"compress/gzip"
-	"encoding/binary"
 	"flag"
 	"fmt"
-	"io"
+	"github.com/eqinox76/RiseAndFallOfEmpires/engine"
 	"math"
 	"math/rand"
 	"net/http"
-	"os"
-	"sort"
 	"time"
 
 	"github.com/ajstarks/svgo"
-	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
 	"github.com/eqinox76/RiseAndFallOfEmpires/state"
 	v "github.com/eqinox76/RiseAndFallOfEmpires/vector"
-	"github.com/gogo/protobuf/proto"
 )
 
-var path = flag.String("path", "state.tmp", "state which will be read")
-
 var picChan = make(chan []byte)
+
+var freeColors = []string{
+	"aliceblue",
+	"antiquewhite",
+	"aqua",
+	"aquamarine",
+	"azure",
+	"beige",
+	"bisque",
+	"black",
+	"blanchedalmond",
+	"blue",
+	"blueviolet",
+	"brown",
+	"burlywood",
+	"cadetblue",
+	"chartreuse",
+	"chocolate",
+	"coral",
+	"cornflowerblue",
+	"cornsilk",
+	"crimson",
+	"cyan",
+	"darkblue",
+	"darkcyan",
+	"darkgoldenrod",
+	"darkgray",
+	"darkgreen",
+	"darkkhaki",
+	"darkmagenta",
+	"darkolivegreen",
+	"darkorange",
+	"darkorchid",
+	"darkred",
+	"darksalmon",
+	"darkseagreen",
+	"darkslateblue",
+	"darkslategray",
+	"darkturquoise",
+	"darkviolet",
+	"deeppink",
+	"deepskyblue",
+	"dimgray",
+	"dodgerblue",
+	"firebrick",
+	"floralwhite",
+	"forestgreen",
+	"fuchsia",
+	"gainsboro",
+	"ghostwhite",
+	"gold",
+	"goldenrod",
+	"green",
+	"greenyellow",
+	"honeydew",
+	"hotpink",
+	"indianred",
+	"indigo",
+	"ivory",
+	"khaki",
+	"lavender",
+	"lavenderblush",
+	"lawngreen",
+	"lemonchiffon",
+	"lightblue",
+	"lightcoral",
+	"lightcyan",
+	"lightgoldenrodyellow",
+	"lightgray",
+	"lightgreen",
+	"lightpink",
+	"lightsalmon",
+	"lightseagreen",
+	"lightskyblue",
+	"lightslategray",
+	"lightsteelblue",
+	"lightyellow",
+	"lime",
+	"limegreen",
+	"linen",
+	"magenta",
+	"maroon",
+	"mediumaquamarine",
+	"mediumblue",
+	"mediumorchid",
+	"mediumpurple",
+	"mediumseagreen",
+	"mediumslateblue",
+	"mediumspringgreen",
+	"mediumturquoise",
+	"mediumvioletred",
+	"midnightblue",
+	"mintcream",
+	"mistyrose",
+	"moccasin",
+	"navajowhite",
+	"navy",
+	"oldlace",
+	"olive",
+	"olivedrab",
+	"orange",
+	"orangered",
+	"orchid",
+	"palegoldenrod",
+	"palegreen",
+	"paleturquoise",
+	"palevioletred",
+	"papayawhip",
+	"peachpuff",
+	"peru",
+	"pink",
+	"plum",
+	"powderblue",
+	"purple",
+	"red",
+	"rosybrown",
+	"royalblue",
+	"saddlebrown",
+	"salmon",
+	"sandybrown",
+	"seagreen",
+	"seashell",
+	"sienna",
+	"silver",
+	"skyblue",
+	"slateblue",
+	"slategray",
+	"snow",
+	"springgreen",
+	"steelblue",
+	"tan",
+	"teal",
+	"thistle",
+	"tomato",
+	"turquoise",
+	"violet",
+	"wheat",
+	"white",
+	"whitesmoke",
+	"yellow",
+	"yellowgreen}"}
+
+type ObserverState struct {
+	eng    engine.GameEngine
+	colors map[*state.Empire]string
+}
 
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
@@ -37,58 +175,49 @@ func main() {
 		http.ListenAndServe(":8079", nil)
 	}()
 
-	f, err := os.Open(*path)
-	if err != nil {
-		panic(err)
+	space := state.NewSpace(10)
+	s := ObserverState{eng: engine.GameEngine{Space: &space}}
+	s.eng.Init()
+
+	s.colors = make(map[*state.Empire]string)
+	for _, empire := range s.eng.Space.Empires {
+		if empire.Passive{
+			s.colors[empire] = "grey"
+			continue
+		}
+
+		pos := rand.Intn(len(freeColors))
+		s.colors[empire] = freeColors[pos]
+		freeColors[pos] = freeColors[len(freeColors)-1 ]
+		freeColors = freeColors[:len(freeColors)-1]
 	}
 
-	defer f.Close()
-
-	reader, err := gzip.NewReader(f)
-	if err != nil {
-		panic(err)
-	}
-
-	for {
-
-		var l uint32
-		err := binary.Read(reader, binary.LittleEndian, &l)
-		if err != nil {
-			fmt.Println("could not read length:", err)
-			break
-		}
-		fmt.Println("going to read", l, "bytes of data")
-		data := make([]byte, l, l)
-		_, err = io.ReadFull(reader, data)
-		if err != nil {
-			panic(err)
-		}
-
-		space := &pb.Space{}
-		err = proto.Unmarshal(data, space)
-		if err != nil {
-			panic(err)
-		}
+	for ! s.eng.Space.Won() {
 
 		var b bytes.Buffer
 		writer := bufio.NewWriter(&b)
 
-		render(writer, space)
+		s.render(writer)
 
 		picChan <- b.Bytes()
+
+		s.eng.Step()
+
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 
-func render(writer *bufio.Writer, space *pb.Space) {
-	width := int(space.Width)
-	height := int(space.Height)
+func (obsState *ObserverState) render(writer *bufio.Writer) {
+	width := int(obsState.eng.Space.Width)
+	height := int(obsState.eng.Space.Height)
 
 	canvas := svg.New(writer)
 	canvas.Start(width, height)
-	connected := make(map[uint32]map[uint32]bool)
-	for _, planet := range space.Planets {
+
+	connected := make(map[*state.Planet]map[*state.Planet]bool)
+	for _, planet := range obsState.eng.Space.Planets {
 		// render connection
-		connected_ids := connected[planet.Id]
+		connected_ids := connected[planet]
 		for _, other := range planet.Connected {
 			if connected_ids[other] {
 				// already painted from the other side
@@ -98,32 +227,31 @@ func render(writer *bufio.Writer, space *pb.Space) {
 			// mark as painted
 			_, ok := connected[other]
 			if !ok {
-				connected[other] = make(map[uint32]bool)
+				connected[other] = make(map[*state.Planet]bool)
 			}
-			connected[other][planet.Id] = true
-			empire := space.Empires[planet.Empire]
-			if planet.Empire == space.Planets[other].Empire && !empire.Passive {
-				canvas.Line(int(planet.PosX), int(planet.PosY), int(space.Planets[other].PosX), int(space.Planets[other].PosY), fmt.Sprintf("stroke:white; stroke-width:2; stroke-opacity: 0.4; stroke: %s", empire.Color))
+			connected[other][planet] = true
+			empire := planet.Empire
+			if planet.Empire == other.Empire && !empire.Passive {
+				canvas.Line(int(planet.PosX), int(planet.PosY), int(other.PosX), int(other.PosY), fmt.Sprintf("stroke:white; stroke-width:2; stroke-opacity: 0.4; stroke: %s", obsState.colors[empire]))
 			} else {
-				canvas.Line(int(planet.PosX), int(planet.PosY), int(space.Planets[other].PosX), int(space.Planets[other].PosY), "stroke:white; stroke-width:2; stroke-opacity: 0.4")
+				canvas.Line(int(planet.PosX), int(planet.PosY), int(other.PosX), int(other.PosY), "stroke:white; stroke-width:2; stroke-opacity: 0.4")
 			}
 		}
 
 		// render planet
-		color := space.Empires[planet.Empire].Color
+		color := obsState.colors[planet.Empire]
 		canvas.Circle(int(planet.PosX), int(planet.PosY), 8, fmt.Sprintf("fill-opacity: %f; fill: %s", planet.Control, color))
-		canvas.Circle(int(planet.PosX), int(planet.PosY), 8, fmt.Sprintf("fill: none; stroke: %s; stroke-width: 4", color))
+		canvas.Circle(int(planet.PosX), int(planet.PosY), 8, fmt.Sprintf("fill: none; stroke: %s; stroke-width: 2", color))
 		canvas.Circle(int(planet.PosX), int(planet.PosY), 10, fmt.Sprintf("fill: none; stroke: white; stroke-width: 1"))
 
-		// id
-		//canvas.Text(int(planet.PosX), int(planet.PosY)-25, fmt.Sprint(planet.Id), "text-anchor:middle;font-size:10px;fill:blue")
+		// #fleets
+		//canvas.Text(int(planet.PosX), int(planet.PosY)-25, fmt.Sprint(len(planet.Fleets)), "text-anchor:middle;font-size:10px;fill:blue")
 
-		fleets := state.GetFleets(space.Ships, planet)
+		fleets := planet.Fleets
 		if len(fleets) == 1 {
-			for empire, fleet := range fleets {
-				if !space.Empires[empire].Passive {
-					canvas.Text(int(planet.PosX), int(planet.PosY)-25, fmt.Sprint(len(fleet)), fmt.Sprintf("text-anchor:middle;dominant-baseline;font-size:16px;stroke:%s;fill:%s", space.Empires[empire].Color, space.Empires[empire].Color))
-				}
+			fleet := fleets[0]
+			if !fleet.Empire.Passive {
+				canvas.Text(int(planet.PosX), int(planet.PosY)-25, fmt.Sprint(fleet.Size()), fmt.Sprintf("text-anchor:middle;dominant-baseline;font-size:16px;stroke:%s;fill:%s", obsState.colors[fleet.Empire], obsState.colors[fleet.Empire]))
 			}
 		} else {
 			center := v.Vec{
@@ -132,40 +260,31 @@ func render(writer *bufio.Writer, space *pb.Space) {
 			}
 			nextDegree := 0.
 			// more than one fleet. compute the position and rotation
-			empires := sort.IntSlice{}
-			for e := range fleets {
-				empires = append(empires, int(e))
-			}
-			sort.Sort(empires)
 
-			for _, eId := range empires {
-				empire := space.Empires[uint32(eId)]
-				fleet := fleets[uint32(eId)]
+			for _, fleet := range planet.Fleets {
 				pos := center.MoveDegree(nextDegree, 25)
 
-				canvas.Text(int(pos.X), int(pos.Y), fmt.Sprint(len(fleet)), fmt.Sprintf("text-anchor:middle;dominant-baseline:central;font-size:16px;stroke:%s;fill:%s", empire.Color, empire.Color))
+				canvas.Text(int(pos.X), int(pos.Y), fmt.Sprint(fleet.Size()), fmt.Sprintf("text-anchor:middle;dominant-baseline:central;font-size:16px;stroke:%s;fill:%s", obsState.colors[fleet.Empire], obsState.colors[fleet.Empire]))
 
 				nextDegree += float64(360 / len(fleets))
 			}
 		}
 
-		// show at most 50 ships
-		counter := 0
-		for ship := range planet.Orbiting {
-			if counter > 50 {
-				break
+		// show at most 10 ships per fleet
+		for _, fleet := range planet.Fleets {
+			size := int(math.Min(float64(fleet.Size()), 10))
+			for i := 0; i <size; i++ {
+				degree := 2 * math.Pi * rand.Float64()
+				canvas.Circle(int(float64(planet.PosX)+(14*math.Sin(degree))),
+					int(float64(planet.PosY)+(14*math.Cos(degree))),
+					1,
+					fmt.Sprintf("stroke: %s; stroke-width: 1", obsState.colors[fleet.Empire]))
 			}
-			counter++
-			degree := 2 * math.Pi * rand.Float64()
-			canvas.Circle(int(float64(planet.PosX)+(14*math.Sin(degree))),
-				int(float64(planet.PosY)+(14*math.Cos(degree))),
-				1,
-				fmt.Sprintf("stroke: %s; stroke-width: 1", space.Empires[space.Ships[ship].Empire].Color))
 		}
 	}
 
 	canvas.Text(0, 10, fmt.Sprintf("Created: %s", time.Now()), "font-size:10px;fill:green")
-	canvas.Text(0, 20, fmt.Sprintf("Round: %d", space.Round), "font-size:10px;fill:green")
+	canvas.Text(0, 20, fmt.Sprintf("Round: %d", obsState.eng.Space.Round), "font-size:10px;fill:green")
 
 	canvas.End()
 	writer.Flush()
@@ -194,7 +313,8 @@ function update() {
 
 	var space = document.getElementById("space");
 	var img = document.createElement('img');
-	img.src = 'space.svg'
+	// firefox really needs this. no clue why the Cache-Control Headers are not enough.
+	img.src = 'space.svg?t=t'+ Math.random(5);
 	img.onload = function(){
 		while (space.firstChild) {
 			space.removeChild(space.firstChild);
@@ -202,6 +322,10 @@ function update() {
 
 		space.insertBefore(img, null);
 	}
+
+	img.onerror = function() {
+		console.log("Error loading " + this.src);
+	};
 
 	// keep going
     requestAnimationFrame(update);
@@ -223,8 +347,8 @@ func worldViewer(writer http.ResponseWriter, _ *http.Request) {
 
 	writer.Header().Set("Content-Type", "image/svg+xml")                        // set the content-type header
 	writer.Header().Set("Cache-Control", "no-cache, must-revalidate, no-store") // force no cache
+	writer.Header().Set("Expires", "-1")
 
 	fmt.Println(len(picture), "bytes svg send")
 	writer.Write(picture)
-
 }

@@ -1,138 +1,38 @@
 package engine
 
 import (
-	"testing"
-	"math/rand"
-	"time"
-	"github.com/eqinox76/RiseAndFallOfEmpires/state"
-	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
 	"fmt"
+	"github.com/eqinox76/RiseAndFallOfEmpires/commands"
+	"github.com/eqinox76/RiseAndFallOfEmpires/state"
+	"math/rand"
+	"testing"
+	"time"
 )
 
-// let three times 1000 ships figth until no one is remaining or the planet gets occupied by a fleet
+// let three times 1000 ships fight until no one is remaining or the planet gets occupied by a fleet
 func TestFightsEnd(t *testing.T) {
 	rand.Seed(int64(time.Now().Second()))
 
 	space := state.EmptySpace()
+	ge := GameEngine{Space: &space}
 
-	p := space.CreatePlanet(space.CreateEmpire())
+	passiveEmpire := space.CreateEmpire()
+	passiveEmpire.Passive = true
 
-	for e_id := 0; e_id < 3; e_id++ {
+	p := space.CreatePlanet(passiveEmpire)
+
+	for eId := 0; eId < 3; eId++ {
 		e := space.CreateEmpire()
-		for i := 0; i < 1000; i++ {
-			space.CreateShip(p, e)
-		}
+		f := space.CreateFleet(p, e)
+		f.LightSquads = 100
 	}
 
-	fleets := state.GetFleets(space.Ships, p)
-	for len(p.Orbiting) > 0 && p.Empire == 0 {
-		Step(&space)
-		fleets = state.GetFleets(space.Ships, p)
-		for id, fleet := range fleets {
-			fmt.Println(id, len(fleet))
+	for len(p.Fleets) > 0 && p.Empire == passiveEmpire {
+		ge.Step()
+		for id, fleet := range p.Fleets{
+			fmt.Println(id, fleet.Size())
 		}
 		fmt.Println("==", p.Empire, "==")
-	}
-}
-
-func TestMove(t *testing.T) {
-	rand.Seed(int64(time.Now().Second()))
-
-	space := state.EmptySpace()
-
-	p1 := space.CreatePlanet(space.CreateEmpire())
-	for i := 0; i < 50; i ++ {
-		space.CreateShip(p1, space.Empires[p1.Empire])
-	}
-	p2 := space.CreatePlanet(space.CreateEmpire())
-	s := space.CreateShip(p2, space.Empires[p2.Empire])
-
-	space.MoveShip(s.Id, p2.Id, p1.Id)
-
-	if len(p2.Orbiting) > 0 {
-		t.Errorf("%s ships still on p2", len(p2.Orbiting))
-	}
-
-	if len(p1.Orbiting) != 51 {
-		t.Errorf("%d ships on p1", len(p1.Orbiting))
-	}
-
-	switch x := s.GetPosition().(type) {
-	case *pb.Ship_Orbiting:
-		planet := space.Planets[x.Orbiting]
-
-		if planet.Id != p1.Id {
-			t.Error("Wrong position", s)
-		}
-	default:
-		t.Error(s, "Orbits no planet")
-	}
-
-	if len(state.GetFleets(space.Ships, p1)) != 2 {
-		t.Error(state.GetFleets(space.Ships, p1))
-	}
-}
-
-func TestDestroy(t *testing.T) {
-	rand.Seed(int64(time.Now().Second()))
-
-	space := state.EmptySpace()
-
-	p := space.CreatePlanet(space.CreateEmpire())
-	for i := 0; i < 50; i ++ {
-		space.CreateShip(p, space.Empires[p.Empire])
-	}
-
-	space.RemoveShip(space.Ships[rand.Uint64()%uint64(len(space.Ships)-1)])
-	space.CreateShip(p, space.Empires[p.Empire])
-
-	if len(p.Orbiting) != 50 {
-		t.Errorf("%d ships on p1", len(p.Orbiting))
-	}
-}
-
-func TestCreateAndDestroy(t *testing.T) {
-	rand.Seed(int64(time.Now().Second()))
-
-	space := state.EmptySpace()
-
-	p := space.CreatePlanet(space.CreateEmpire())
-
-	s1 := space.CreateShip(p, space.Empires[p.Empire])
-	s2 := space.CreateShip(p, space.Empires[p.Empire])
-	s3 := space.CreateShip(p, space.Empires[p.Empire])
-	s4 := space.CreateShip(p, space.Empires[p.Empire])
-
-	space.RemoveShip(s2)
-	space.RemoveShip(s3)
-	s5 := space.CreateShip(p, space.Empires[p.Empire])
-	for k, _ := range space.Ships {
-		fmt.Print(k, "|")
-	}
-
-	if s1.Id == s5.Id ||
-		s4.Id == s5.Id {
-		t.Error(s1, s2, s3, s4, s5)
-	}
-
-	s2 = space.CreateShip(p, space.Empires[p.Empire])
-	for k, _ := range space.Ships {
-		fmt.Print(k, "|")
-	}
-	if s1.Id == s2.Id ||
-		s4.Id == s2.Id ||
-		s5.Id == s2.Id {
-		t.Error(s1, s2, s3, s4, s5)
-	}
-	s3 = space.CreateShip(p, space.Empires[p.Empire])
-	for k, _ := range space.Ships {
-		fmt.Print(k, "|")
-	}
-	if s1.Id == s3.Id ||
-		s2.Id == s3.Id ||
-		s4.Id == s3.Id ||
-		s5.Id == s3.Id {
-		t.Error(s1, s2, s3, s4, s5)
 	}
 }
 
@@ -140,30 +40,33 @@ func TestMoveAndFight(t *testing.T) {
 	rand.Seed(int64(time.Now().Second()))
 
 	space := state.EmptySpace()
+	ge := GameEngine{Space: &space}
 
-	p1 := space.CreatePlanet(space.CreateEmpire())
-	space.Empires[p1.Empire].Passive = true
-	for i := 0; i < 50; i ++ {
-		space.CreateShip(p1, space.Empires[p1.Empire])
-	}
-	p2 := space.CreatePlanet(space.CreateEmpire())
+	e1:= space.CreateEmpire()
+	e1.Passive = true
+	p1 := space.CreatePlanet(e1)
+
+	f1 := space.CreateFleet(p1, e1)
+	f1.HeavySquads = 50
+
+	e2:= space.CreateEmpire()
+	p2 := space.CreatePlanet(e2)
+	f2 := space.CreateFleet(p2, e2)
+	f2.RangedSquads = 5
 
 	for p1.Empire != p2.Empire {
-		for ship, _ := range p2.Orbiting {
-			space.MoveShip(ship, p2.Id, p1.Id)
+		for _, fleet := range p1.Fleets {
+			c := commands.MoveCommand{Destination: p2, Fleet:fleet}
+			c.Execute()
 		}
 
-		if len(p2.Orbiting) > 0 {
-			t.Error(p2.Orbiting)
-		}
+		ge.Step()
 
-		Step(&space)
-
-		fleets := state.GetFleets(space.Ships, p1)
-		for id, fleet := range fleets {
-			fmt.Println(id, len(fleet))
+		for _, fleet := range p2.Fleets {
+			fmt.Println("on p2", fleet.Size(), "ships", &fleet.Empire)
 		}
-		fmt.Println("==", p1.Empire, "==")
+		fmt.Println("==", &p1.Empire, "==", &p2.Empire, "==")
+
 	}
 }
 
@@ -172,23 +75,25 @@ func TestControl(t *testing.T) {
 
 	space := state.EmptySpace()
 
+	ge := GameEngine{Space: &space}
+
 	e1 := space.CreateEmpire()
 	p := space.CreatePlanet(e1)
 	p.Control = 0.5
 
-	Step(&space)
+	ge.Step()
 	if p.Control <= 0.5 {
-		t.Errorf("Control did not increase %s", p)
+		t.Errorf("Control did not increase %v", p)
+		return
 	}
 
-	for i := 0; i < 10; i ++ {
-		space.CreateShip(p, e1)
-	}
+	space.CreateFleet(p, e1)
 
 	old := p.Control
-	Step(&space)
+	ge.Step()
 	if p.Control <= old {
-		t.Errorf("Control did not increase %s", p)
+		t.Errorf("Control did not increase %v", p)
+		return
 	}
 }
 
@@ -196,34 +101,35 @@ func TestInvade(t *testing.T) {
 	rand.Seed(int64(time.Now().Second()))
 
 	space := state.EmptySpace()
+	ge := GameEngine{Space: &space}
 
 	e1 := space.CreateEmpire()
 	e2 := space.CreateEmpire()
-	e3 := space.CreateEmpire()
 	p := space.CreatePlanet(e1)
 	p.Control = 0.5
-	for i := 0; i < 10; i ++ {
-		space.CreateShip(p, e2)
-	}
 
-	space.CreateShip(p, e3)
+	f2:=space.CreateFleet(p, e2)
+	f2.LightSquads = 10
 
-	Step(&space)
+	ge.Step()
 	if p.Control >= 0.5 {
-		t.Errorf("Control did not decrease %s", p)
+		t.Errorf("Control did not decrease %v", p)
+		return
 	}
 
 	counter := 0
-	for p.Empire == e1.Id {
-		Step(&space)
+	for p.Empire == e1 {
+		ge.Step()
 		counter++
 	}
 
-	if p.Empire != e2.Id{
-		t.Errorf("planet did not change owner %s", p)
+	if p.Empire != e2 {
+		t.Errorf("planet did not change owner %v", p)
+		return
 	}
 
 	if counter < 10 {
-		t.Errorf("planet changed owner to fast %s %d", p ,counter)
+		t.Errorf("planet changed owner to fast %v %d", p, counter)
+		return
 	}
 }

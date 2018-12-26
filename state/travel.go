@@ -1,30 +1,31 @@
 package state
 
 import (
-	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
 	"fmt"
 	"log"
 )
 
 type Node struct {
-	Planet     *pb.Planet
-	former     uint32
+	Planet     *Planet
+	id         int
+	former     int
 	dist       int
 	generation uint32
 }
 
-func (a Node) Equal(b Node) bool {
-	return a.Planet.Id == b.Planet.Id
+func (a Node) Equal(b *Node) bool {
+	return a.Planet == b.Planet
 }
 
-type Graph struct{
-	nodes []Node
-	generation uint32
+type Graph struct {
+	nodes            []Node
+	translationTable map[*Planet]*Node
+	generation       uint32
 }
 
 type edge struct {
-	from uint32
-	to   uint32
+	from int
+	to   int
 	dist float64
 }
 
@@ -36,29 +37,32 @@ func (a Edges) Less(i, j int) bool {
 	return a[i].dist < a[j].dist
 }
 
-func NewGraph(planets map[uint32]*pb.Planet) Graph {
-	elems := make([]Node, len(planets))
+func NewGraph(planets []*Planet) Graph {
+
+	g := Graph{
+		nodes:            make([]Node, len(planets)),
+		translationTable: make(map[*Planet]*Node),
+		generation:       0,
+	}
 	for i, planet := range planets {
-		elems[i].Planet = planet
+		g.nodes[i].id = i
+		g.nodes[i].Planet = planet
+		g.translationTable[planet] = &g.nodes[i]
 	}
 
-	return Graph{
-		elems,
-		0,
-	}
+	return g
 }
 
-func (g *Graph) Visit(rootId uint32, f func(n Node) bool) {
-	root := g.nodes[rootId]
+func (g *Graph) Visit(planet *Planet, f func(n Node) bool) {
 	g.generation += 2
 	queue := make([]*Node, 0)
 
-	queue = append(queue, &g.nodes[root.Planet.Id])
+	queue = append(queue, g.translationTable[planet])
 	for len(queue) > 0 {
 		elem := queue[0]
 		queue = queue[1:]
 
-		cont := f(g.nodes[elem.Planet.Id])
+		cont := f(g.nodes[elem.id])
 		elem.generation = g.generation
 		if !cont {
 			return
@@ -66,47 +70,47 @@ func (g *Graph) Visit(rootId uint32, f func(n Node) bool) {
 
 		// visit children
 		for _, child := range elem.Planet.Connected {
-			if g.nodes[child].generation == g.generation {
+			if g.translationTable[child].generation == g.generation {
 				// already visited
 				continue
 			}
-			queue = append(queue, &g.nodes[child])
+			queue = append(queue, g.translationTable[child])
 
-			if g.nodes[child].generation < g.generation-1 || // never seen this child
-				g.nodes[child].dist > elem.dist+1 { // the current path is shorter than the old one
+			if g.translationTable[child].generation < g.generation-1 || // never seen this child
+				g.translationTable[child].dist > elem.dist+1 { // the current path is shorter than the old one
 
-				// set distance and paht
-				g.nodes[child].dist = elem.dist + 1
-				g.nodes[child].former = elem.Planet.Id
+				// set distance and path
+				g.translationTable[child].dist = elem.dist + 1
+				g.translationTable[child].former = elem.id
 				// mark as seen
-				g.nodes[child].generation = g.generation - 1
+				g.translationTable[child].generation = g.generation - 1
 			}
 		}
 	}
 }
 
-func (g *Graph) ShortestPath(root uint32, target uint32, graph_is_prepared bool) []uint32 {
-	if ! graph_is_prepared {
+func (g *Graph) ShortestPath(root *Planet, target *Planet, graphIsPrepared bool) []*Planet {
+	if ! graphIsPrepared {
 		g.Visit(root, func(n Node) bool {
-			return !g.nodes[target].Equal(n)
+			return !g.translationTable[target].Equal(&n)
 		})
 	}
 
-	path := make([]uint32, 0)
+	path := make([]*Planet, 0)
 
-	cur := g.nodes[target]
-	path = append(path, cur.Planet.Id)
-	for !cur.Equal(g.nodes[root]) {
-		path = append(path, cur.former)
+	cur := *g.translationTable[target]
+	path = append(path, target)
+	for !cur.Equal(g.translationTable[root]) {
+		path = append(path, g.nodes[cur.former].Planet)
 		cur = g.nodes[cur.former]
 		if len(path) > 500 {
-			fmt.Println(root, g.nodes[root].Planet.Connected)
-			fmt.Println(target, g.nodes[target].Planet.Connected)
+			fmt.Println(root, g.translationTable[root].Planet.Connected)
+			fmt.Println(target, g.translationTable[target].Planet.Connected)
 			fmt.Println(path)
 			for i := 0; i < 5; i++ {
-				fmt.Println("  ", path[i], g.nodes[path[i]].Planet.Connected, "dist", g.nodes[path[i]].dist, "former", g.nodes[path[i]].former, "gen", g.nodes[path[i]].generation)
+				fmt.Println("  ", path[i], g.translationTable[path[i]].Planet.Connected, "dist", g.translationTable[path[i]].dist, "former", g.translationTable[path[i]].former, "gen", g.translationTable[path[i]].generation)
 			}
-			log.Panicf("Unintended behavior when checking path from %d to %d ", root, target, path)
+			log.Panicf("Unintended behavior when checking path from %v to %v, %v", root, target, path)
 		}
 	}
 
@@ -122,7 +126,7 @@ func (g *Graph) GraphSize(root Node) int {
 
 	count := 0
 
-	g.Visit(root.Planet.Id, func(planet Node) bool {
+	g.Visit(root.Planet, func(planet Node) bool {
 		count++
 		return true
 	})
@@ -130,7 +134,7 @@ func (g *Graph) GraphSize(root Node) int {
 	return count
 }
 
-func (g *Graph) HasCycle(root *pb.Planet) bool {
+func (g *Graph) HasCycle(root *Planet) bool {
 	g.generation++
 
 	// remember which edges we already traveled
@@ -138,7 +142,7 @@ func (g *Graph) HasCycle(root *pb.Planet) bool {
 
 	// queue for bfs
 	queue := make([]*Node, 0)
-	queue = append(queue, &g.nodes[root.Id])
+	queue = append(queue, g.translationTable[root])
 
 	for len(queue) > 0 {
 
@@ -154,13 +158,13 @@ func (g *Graph) HasCycle(root *pb.Planet) bool {
 
 		// visit children
 		for _, child := range elem.Planet.Connected {
-			e := edge{elem.Planet.Id, child, 0}
+			e := edge{elem.id, g.translationTable[child].id, 0}
 			// we come by this edge to this node therefore we can ignore it
 			if usedEdges[e] {
 				continue
 			}
-			usedEdges[edge{child, elem.Planet.Id, 0}] = true
-			queue = append(queue, &g.nodes[child])
+			usedEdges[edge{g.translationTable[child].id, elem.id, 0}] = true
+			queue = append(queue, g.translationTable[child])
 		}
 	}
 

@@ -4,202 +4,47 @@ import (
 	"math/rand"
 
 	"github.com/dhconnelly/rtreego"
-	pb "github.com/eqinox76/RiseAndFallOfEmpires/proto"
-	"github.com/eqinox76/RiseAndFallOfEmpires/util"
 	v "github.com/eqinox76/RiseAndFallOfEmpires/vector"
-	"github.com/golang/protobuf/proto"
-
-	"encoding/binary"
-	"fmt"
 	"math"
 	"sort"
 )
 
+type Empire struct {
+	Passive bool
+	Planets []*Planet
+	Fleets  []*Fleet
+}
+
 type Space struct {
-	pb.Space
+	Fleets  []*Fleet
+	Empires []*Empire
+	Planets []*Planet
+
+	Round int
+
 	PlanetTree *rtreego.Rtree
 	Graph      Graph
-	freeColors []string
+	Width      uint32
+	Height     uint32
 }
 
-// MoveFleet for now lets just teleport ships
-func (space *Space) MoveFleet(fleetid uint32, start uint32, destination uint32) {
-	space.Fleets[fleetid].Position = destination
-
-	space.Planets[start].Fleets = util.Removeu32(space.Planets[start].Fleets, fleetid)
-	space.Planets[start].Fleets = append(space.Planets[destination].Fleets, fleetid)
+func (planet Planet) Bounds() *rtreego.Rect {
+	return rtreego.Point{float64(planet.PosX), float64(planet.PosY)}.ToRect(0)
 }
 
-// RemoveShip removes a ship. throws if none is available
-func (space *Space) RemoveShip(shiptype uint32, fleetid uint32) {
-	available := space.Fleets[fleetid].Ships[shiptype]
-	if available == 0 {
-		panic(fmt.Sprintf("Cannot remove because fleet %T has no %T!", fleetid, shiptype))
-	} else {
-		space.Fleets[fleetid].Ships[shiptype]--
+func asVec(planet *Planet) v.Vec {
+	return v.Vec{
+		X: float64(planet.PosX),
+		Y: float64(planet.PosY),
 	}
-}
-
-type PlanetPos struct {
-	*pb.Planet
-}
-
-func (p PlanetPos) Bounds() *rtreego.Rect {
-	return rtreego.Point{float64(p.PosX), float64(p.PosY)}.ToRect(0)
 }
 
 func EmptySpace() Space {
 	space := Space{
-		Space: pb.Space{
-			Width:   1000,
-			Height:  600,
-			Fleets:  nil,
-			Planets: make(map[uint32]*pb.Planet),
-			Empires: make(map[uint32]*pb.Empire),
-		},
+		Width:      1600,
+		Height:     900,
 		PlanetTree: rtreego.NewTree(2, 32, 64),
 	}
-
-	space.freeColors = []string{
-		"aliceblue",
-		"antiquewhite",
-		"aqua",
-		"aquamarine",
-		"azure",
-		"beige",
-		"bisque",
-		"black",
-		"blanchedalmond",
-		"blue",
-		"blueviolet",
-		"brown",
-		"burlywood",
-		"cadetblue",
-		"chartreuse",
-		"chocolate",
-		"coral",
-		"cornflowerblue",
-		"cornsilk",
-		"crimson",
-		"cyan",
-		"darkblue",
-		"darkcyan",
-		"darkgoldenrod",
-		"darkgray",
-		"darkgreen",
-		"darkkhaki",
-		"darkmagenta",
-		"darkolivegreen",
-		"darkorange",
-		"darkorchid",
-		"darkred",
-		"darksalmon",
-		"darkseagreen",
-		"darkslateblue",
-		"darkslategray",
-		"darkturquoise",
-		"darkviolet",
-		"deeppink",
-		"deepskyblue",
-		"dimgray",
-		"dodgerblue",
-		"firebrick",
-		"floralwhite",
-		"forestgreen",
-		"fuchsia",
-		"gainsboro",
-		"ghostwhite",
-		"gold",
-		"goldenrod",
-		"green",
-		"greenyellow",
-		"honeydew",
-		"hotpink",
-		"indianred",
-		"indigo",
-		"ivory",
-		"khaki",
-		"lavender",
-		"lavenderblush",
-		"lawngreen",
-		"lemonchiffon",
-		"lightblue",
-		"lightcoral",
-		"lightcyan",
-		"lightgoldenrodyellow",
-		"lightgray",
-		"lightgreen",
-		"lightpink",
-		"lightsalmon",
-		"lightseagreen",
-		"lightskyblue",
-		"lightslategray",
-		"lightsteelblue",
-		"lightyellow",
-		"lime",
-		"limegreen",
-		"linen",
-		"magenta",
-		"maroon",
-		"mediumaquamarine",
-		"mediumblue",
-		"mediumorchid",
-		"mediumpurple",
-		"mediumseagreen",
-		"mediumslateblue",
-		"mediumspringgreen",
-		"mediumturquoise",
-		"mediumvioletred",
-		"midnightblue",
-		"mintcream",
-		"mistyrose",
-		"moccasin",
-		"navajowhite",
-		"navy",
-		"oldlace",
-		"olive",
-		"olivedrab",
-		"orange",
-		"orangered",
-		"orchid",
-		"palegoldenrod",
-		"palegreen",
-		"paleturquoise",
-		"palevioletred",
-		"papayawhip",
-		"peachpuff",
-		"peru",
-		"pink",
-		"plum",
-		"powderblue",
-		"purple",
-		"red",
-		"rosybrown",
-		"royalblue",
-		"saddlebrown",
-		"salmon",
-		"sandybrown",
-		"seagreen",
-		"seashell",
-		"sienna",
-		"silver",
-		"skyblue",
-		"slateblue",
-		"slategray",
-		"snow",
-		"springgreen",
-		"steelblue",
-		"tan",
-		"teal",
-		"thistle",
-		"tomato",
-		"turquoise",
-		"violet",
-		"wheat",
-		"white",
-		"whitesmoke",
-		"yellow",
-		"yellowgreen}"}
 
 	return space
 }
@@ -208,12 +53,10 @@ func NewSpace(empires int) Space {
 	space := EmptySpace()
 
 	neutralEmpire := space.CreateEmpire()
-	space.freeColors = append(space.freeColors, neutralEmpire.Color)
-	neutralEmpire.Color = "grey"
 	neutralEmpire.Passive = true
 
 	// add planets
-	for i := uint32(0); i < 100; i++ {
+	for i := uint32(0); i < 130; i++ {
 		space.CreatePlanet(neutralEmpire)
 	}
 
@@ -222,12 +65,12 @@ func NewSpace(empires int) Space {
 		e := space.CreateEmpire()
 
 		p := space.Planets[uint32(rand.Int()%(len(space.Planets)))]
-		for p.Empire != 0 {
+		for p.Empire != neutralEmpire {
 			p = space.Planets[uint32(rand.Int()%(len(space.Planets)))]
 		}
 
-		p.Empire = e.Id
-		e.Planets[p.Id] = true
+		e.Planets = append(e.Planets, p)
+		p.Empire = e
 		p.Control = 1
 		p.Production = 0
 	}
@@ -235,12 +78,12 @@ func NewSpace(empires int) Space {
 	space.Graph = NewGraph(space.Planets)
 	// add the shortest paths until we have all nodes connected and do not add edges which add a cycle
 	var edges Edges
-	for _, planet := range space.Planets {
-		for _, to := range space.Planets {
-			if planet.Id >= to.Id {
+	for i, planet := range space.Planets {
+		for toI, to := range space.Planets {
+			if i >= toI {
 				continue
 			}
-			edges = append(edges, edge{planet.Id, to.Id, asVec(planet).Dist(asVec(to))})
+			edges = append(edges, edge{i, toI, asVec(planet).Dist(asVec(to))})
 		}
 	}
 
@@ -249,7 +92,7 @@ func NewSpace(empires int) Space {
 
 	// add lanes between planets
 	// this is done by adding all edged for a minimal spanning tree based on distance
-	root := space.Graph.nodes[space.Planets[0].Id]
+	root := space.Graph.nodes[0]
 	for _, edge := range edges {
 		if space.Graph.GraphSize(root) == len(space.Planets) {
 			// done
@@ -259,8 +102,8 @@ func NewSpace(empires int) Space {
 		// add edge
 		from := space.Planets[edge.from]
 		to := space.Planets[edge.to]
-		from.Connected = append(from.Connected, to.Id)
-		to.Connected = append(to.Connected, from.Id)
+		from.Connected = append(from.Connected, to)
+		to.Connected = append(to.Connected, from)
 
 		// check if cycling
 		if space.Graph.HasCycle(from) {
@@ -279,7 +122,7 @@ func NewSpace(empires int) Space {
 
 			nn := space.PlanetTree.NearestNeighbors(size+2, rtreego.Point{float64(planet.PosX), float64(planet.PosY)})
 
-			to, ok := nn[size+1].(*PlanetPos)
+			to, ok := nn[size+1].(*Planet)
 			if !ok {
 				panic(nn[size+1])
 			}
@@ -287,71 +130,50 @@ func NewSpace(empires int) Space {
 			// check if this edge already exists
 			exists := false
 			for _, id := range planet.Connected {
-				if id == to.Id {
+				if id == to {
 					exists = true
 					break
 				}
 			}
 
 			if !exists {
-				planet.Connected = append(planet.Connected, to.Id)
-				to.Connected = append(to.Connected, planet.Id)
+				planet.Connected = append(planet.Connected, to)
+				to.Connected = append(to.Connected, planet)
 			}
 		}
 	}
 
 	// add neutral fleets
 	for _, planet := range space.Planets {
-		if planet.Empire == 0 {
-			ships := 2 + rand.Intn(8)
-			for ; ships > 0; ships-- {
-				fleetId := space.createFleet(planet, planet.Empire)
-				space.CreateShip(1, fleetId)
-			}
+		if planet.Empire.Passive {
+			fleet := space.CreateFleet(planet, planet.Empire)
+			fleet.LightSquads = 2 + rand.Intn(8)
 		}
 	}
 
 	return space
 }
 
-func (space *Space) CreateShip(shiptype uint32, fleetid uint32) {
-	space.Fleets[fleetid].Ships[shiptype]++
-}
+func (space *Space) CreateEmpire() *Empire {
 
-func (space *Space) CreateEmpire() *pb.Empire {
-	id := uint32(len(space.Empires))
-	_, contained := space.Empires[id]
-	for ; contained; id++ {
-		_, contained = space.Empires[id]
-	}
+	e := Empire{}
 
-	c := rand.Intn(len(space.freeColors))
-	color := space.freeColors[c]
-	space.freeColors[c] = space.freeColors[len(space.freeColors)-1]
-	space.freeColors = space.freeColors[:len(space.freeColors)-1]
-
-	e := pb.Empire{
-		Id:      id,
-		Color:   color,
-		Fleets:  make(map[uint32]bool),
-		Planets: make(map[uint32]bool),
-	}
-
-	space.Empires[e.Id] = &e
+	space.Empires = append(space.Empires, &e)
 	return &e
 }
 
-func asVec(planet *pb.Planet) v.Vec {
-	return v.Vec{float64(planet.PosX), float64(planet.PosY)}
+func (space *Space) CreateFleet(planet *Planet, empire *Empire) *Fleet {
+	f := Fleet{
+		Empire:   empire,
+		Position: planet,
+	}
+	planet.Fleets = append(planet.Fleets, &f)
+	empire.Fleets = append(empire.Fleets, &f)
+	space.Fleets = append(space.Fleets, &f)
+	return &f
 }
 
-func (space *Space) CreatePlanet(empire *pb.Empire) *pb.Planet {
-	id := uint32(len(space.Planets))
-	_, contained := space.Planets[id]
-	for ; contained; id++ {
-		_, contained = space.Planets[id]
-	}
-
+func (space *Space) CreatePlanet(empire *Empire) *Planet {
 	var x, y uint32
 	for {
 		x, y = rand.Uint32()%space.Width, rand.Uint32()%space.Height
@@ -364,7 +186,10 @@ func (space *Space) CreatePlanet(empire *pb.Empire) *pb.Planet {
 			continue
 		}
 
-		vec := v.Vec{float64(x), float64(y)}
+		vec := v.Vec{
+			X: float64(x),
+			Y: float64(y),
+		}
 		for _, planet := range space.Planets {
 
 			if vec.Dist(asVec(planet)) < 50 {
@@ -378,51 +203,36 @@ func (space *Space) CreatePlanet(empire *pb.Empire) *pb.Planet {
 		}
 	}
 
-	planet := pb.Planet{
-		Id:       id,
-		PosX:     x,
-		PosY:     y,
-		Control:  rand.Float32(),
-		Empire:   empire.Id,
-		Orbiting: make(map[uint64]bool),
+	planet := Planet{
+		PosX:    x,
+		PosY:    y,
+		Control: rand.Float32(),
+		Empire:  empire,
 	}
 
-	empire.Planets[planet.Id] = true
-	space.Planets[planet.Id] = &planet
-	space.PlanetTree.Insert(&PlanetPos{&planet})
+	empire.Planets = append(empire.Planets, &planet)
+	space.Planets = append(space.Planets, &planet)
+	space.PlanetTree.Insert(&planet)
 
 	return &planet
 }
 
-func GetFleets(global_ships map[uint64]*pb.Ship, planet *pb.Planet) map[uint32][]*pb.Ship {
-	fleets := make(map[uint32][]*pb.Ship)
-
-	for id, _ := range planet.Orbiting {
-		s := global_ships[id]
-		_, ok := fleets[s.Empire]
-		if !ok {
-			fleets[s.Empire] = []*pb.Ship{}
+func (space *Space) DestroyFleet(fleet *Fleet){
+	rm := func (fleets []*Fleet,f *Fleet) []*Fleet{
+		for pos, val := range fleets{
+			if val == f{
+				fleets[pos] = fleets[len(fleets) - 1]
+				return fleets[:len(fleets) - 1]
+			}
 		}
-
-		fleets[s.Empire] = append(fleets[s.Empire], s)
+		return fleets
 	}
 
-	return fleets
+	space.Fleets =rm(space.Fleets, fleet)
+	fleet.Empire.Fleets = rm(fleet.Empire.Fleets, fleet)
+	fleet.Position.Fleets = rm(fleet.Position.Fleets, fleet)
 }
 
 func (space *Space) Won() bool {
 	return len(space.Empires) == 2
-}
-
-func Serialize(space *Space) ([]byte, error) {
-
-	data, err := proto.Marshal(&space.Space)
-	if err != nil {
-		return nil, err
-	}
-
-	length := make([]byte, 4)
-	binary.LittleEndian.PutUint32(length, uint32(len(data)))
-
-	return append(length, data...), nil
 }
