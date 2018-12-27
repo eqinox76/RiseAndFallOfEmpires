@@ -76,8 +76,8 @@ func (dist *Distributed) Commands(space *state.Space) []commands2.Command {
 		}
 
 		if lowestNeighborShips != math.MaxInt32 {
-			// if we have more ships send them to the neighbor
-			if myFleet.Size() > int(float32(lowestNeighborShips)*1.5) {
+			// if we are not superior do not send a fleet
+			if myFleet.Size() < int(float32(lowestNeighborShips)*1.5) {
 				// continue with next fleet
 				break
 			}
