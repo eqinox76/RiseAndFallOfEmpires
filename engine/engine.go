@@ -29,7 +29,7 @@ func (engine *GameEngine) Init() {
 		case 0:
 			engine.strats[id] = &strategies.Distributed{}
 		case 1:
-			engine.strats[id] = &strategies.RandomStrategy{}
+			engine.strats[id] = &strategies.Distributed{}
 		}
 		engine.strats[id].Init(empire)
 	}
@@ -74,7 +74,7 @@ func (engine *GameEngine) Step() {
 			fleetSize += float64(fleet.Size())
 		}
 
-		// a empire can at most produce sqrt(100 divisions per fully controlled planet)
+		// a empire can at most produce sqrt(fully controlled planet) * 100 divisions
 		prod = math.Min(prod, (math.Sqrt(totalControl)*100)-fleetSize)
 
 		for ; prod > 0; prod-- {

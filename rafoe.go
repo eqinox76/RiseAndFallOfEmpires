@@ -14,7 +14,7 @@ func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
 	flag.Parse()
 
-	space := state.NewSpace(9)
+	space := state.NewSpace(9, 130)
 	eng := engine.GameEngine{Space: &space}
 	eng.Init()
 

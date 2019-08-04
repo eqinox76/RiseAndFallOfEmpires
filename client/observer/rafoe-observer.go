@@ -175,7 +175,7 @@ func main() {
 		http.ListenAndServe(":8079", nil)
 	}()
 
-	space := state.NewSpace(10)
+	space := state.NewSpace(10, 130)
 	s := ObserverState{eng: engine.GameEngine{Space: &space}}
 	s.eng.Init()
 
@@ -230,6 +230,8 @@ func (obsState *ObserverState) render(writer *bufio.Writer) {
 				connected[other] = make(map[*state.Planet]bool)
 			}
 			connected[other][planet] = true
+
+			// render connection
 			empire := planet.Empire
 			if planet.Empire == other.Empire && !empire.Passive {
 				canvas.Line(int(planet.PosX), int(planet.PosY), int(other.PosX), int(other.PosY), fmt.Sprintf("stroke:white; stroke-width:2; stroke-opacity: 0.4; stroke: %s", obsState.colors[empire]))

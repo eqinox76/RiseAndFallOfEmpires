@@ -49,14 +49,14 @@ func EmptySpace() Space {
 	return space
 }
 
-func NewSpace(empires int) Space {
+func NewSpace(empires int, planets uint32) Space {
 	space := EmptySpace()
 
 	neutralEmpire := space.CreateEmpire()
 	neutralEmpire.Passive = true
 
 	// add planets
-	for i := uint32(0); i < 130; i++ {
+	for i := uint32(0); i < planets; i++ {
 		space.CreatePlanet(neutralEmpire)
 	}
 
