@@ -26,22 +26,32 @@ func (dist *Distributed) Commands(space *state.Space) []commands2.Command {
 	}
 
 	var commands []commands2.Command
+	unmovedFleets := make(map[*state.Planet][]*state.Fleet)
 
 	for _, myFleet := range dist.empire.Fleets {
 
-		if myFleet.Position.Empire != dist.empire || myFleet.Position.Control < 0.5{
-			continue
-		}
-
 		enemiesPresent := false
-		for _, fleet := range myFleet.Position.Fleets{
-			if fleet.Empire != dist.empire{
+		var systemFleet *state.Fleet
+
+		for _, fleet := range myFleet.Position.Fleets {
+			if fleet.Empire != dist.empire {
 				enemiesPresent = true
-				break
+			} else {
+				if systemFleet == nil {
+					systemFleet = fleet
+				}
 			}
 		}
 
-		if enemiesPresent{
+		// do not move if enemies are present
+		if enemiesPresent {
+			unmovedFleets[myFleet.Position] = append(unmovedFleets[myFleet.Position], myFleet)
+			continue
+		}
+
+		// if we are the last fleet here occupy the planet
+		if myFleet == systemFleet && (myFleet.Position.Empire != dist.empire || myFleet.Position.Control < 0.5) {
+			unmovedFleets[myFleet.Position] = append(unmovedFleets[myFleet.Position], myFleet)
 			continue
 		}
 
@@ -78,6 +88,8 @@ func (dist *Distributed) Commands(space *state.Space) []commands2.Command {
 		if lowestNeighborShips != math.MaxInt32 {
 			// if we are not superior do not send a fleet
 			if myFleet.Size() < int(float32(lowestNeighborShips)*1.5) {
+
+				unmovedFleets[myFleet.Position] = append(unmovedFleets[myFleet.Position], myFleet)
 				// continue with next fleet
 				break
 			}
@@ -104,10 +116,33 @@ func (dist *Distributed) Commands(space *state.Space) []commands2.Command {
 
 			target := dist.graph.ShortestPath(myFleet.Position, targetId, true)
 			if len(target) < 2 {
-				return nil
+				unmovedFleets[myFleet.Position] = append(unmovedFleets[myFleet.Position], myFleet)
+			} else {
+				commands = append(commands, commands2.MoveCommand{Destination: target[1], Fleet: myFleet})
+			}
+		}
+	}
+
+	// merge Fleets
+	// try to have log(max ships) fleets
+	var sumFleets float64
+	for _, fleet := range dist.empire.Fleets {
+		sumFleets += float64(fleet.Size())
+	}
+	maxFleetSize := sumFleets/math.Log(sumFleets) + 1
+
+	for _, fleets := range unmovedFleets {
+		if len(fleets) >= 2 {
+			var toBeMerged []*state.Fleet
+			for _, fleet := range fleets {
+				if fleet.Size() < int(maxFleetSize) {
+					toBeMerged = append(toBeMerged, fleet)
+				}
 			}
 
-			commands = append(commands, commands2.MoveCommand{Destination: target[1], Fleet: myFleet})
+			if len(toBeMerged) >= 2 {
+				commands = append(commands, commands2.FleetMergeCommand{Fleet: toBeMerged})
+			}
 		}
 	}
 

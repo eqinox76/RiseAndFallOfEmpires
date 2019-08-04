@@ -29,19 +29,19 @@ func TestSendToFront(t *testing.T) {
 	strat.Init(e1)
 
 	cmds := strat.Commands(&space)
-	cmds[0].Execute()
+	cmds[0].Execute(&space)
 	if len(cmds) != 1 || len(p2.Fleets) != 1 {
 		t.Error("Fleet did not move to next planet")
 		return
 	}
 	cmds = strat.Commands(&space)
-	cmds[0].Execute()
+	cmds[0].Execute(&space)
 	if len(cmds) != 1 || len(p3.Fleets) != 1 {
 		t.Error("Fleet did not move to next planet")
 		return
 	}
 	cmds = strat.Commands(&space)
-	cmds[0].Execute()
+	cmds[0].Execute(&space)
 	if len(cmds) != 1 || len(p4.Fleets) != 1 {
 		t.Error("Fleet did not move to next planet")
 		return
