@@ -1,5 +1,5 @@
 # RiseAndFallOfEmpires
-Simple star strategy game to experiment with new technologies.
+Simple strategy game to experiment with new technologies.
 
 # install
 Install (golang)[https://golang.org/].

@@ -2,14 +2,12 @@ package engine
 
 import (
 	"github.com/eqinox76/RiseAndFallOfEmpires/commands"
+	"github.com/eqinox76/RiseAndFallOfEmpires/state"
 	"github.com/eqinox76/RiseAndFallOfEmpires/strategies"
+	"github.com/eqinox76/RiseAndFallOfEmpires/util"
 	"log"
 	"math"
 	"math/rand"
-	"reflect"
-
-	"github.com/eqinox76/RiseAndFallOfEmpires/state"
-	"github.com/eqinox76/RiseAndFallOfEmpires/util"
 )
 
 type GameEngine struct {
@@ -109,26 +107,15 @@ func (engine *GameEngine) Step() {
 	for _, s := range engine.strats {
 		cmds = append(cmds, s.Commands(engine.Space)...)
 	}
+
 	for _, cmd := range cmds {
-		processCommand(cmd)
-	}
-	return
-}
-
-func processCommand(command commands.Command) {
-	switch cmd := command.(type) {
-	case commands.MoveCommand:
-		// validate
-
-		if ! command.Validate() {
+		if ! cmd.Validate() {
 			log.Fatal(cmd, "Invalid command")
 		} else {
-			command.Execute()
+			cmd.Execute(engine.Space)
 		}
-
-	default:
-		log.Fatalln(reflect.TypeOf(command), "not implemented")
 	}
+	return
 }
 
 func (engine *GameEngine) computeFight(planet *state.Planet) {

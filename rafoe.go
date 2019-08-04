@@ -15,7 +15,7 @@ func main() {
 	flag.Parse()
 
 	space := state.NewSpace(9)
-	eng := engine.GameEngine{Space: space}
+	eng := engine.GameEngine{Space: &space}
 	eng.Init()
 
 	// compute game state until the game is done

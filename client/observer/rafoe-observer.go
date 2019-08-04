@@ -203,7 +203,7 @@ func main() {
 
 		s.eng.Step()
 
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 	}
 }
 
@@ -349,6 +349,6 @@ func worldViewer(writer http.ResponseWriter, _ *http.Request) {
 	writer.Header().Set("Cache-Control", "no-cache, must-revalidate, no-store") // force no cache
 	writer.Header().Set("Expires", "-1")
 
-	fmt.Println(len(picture), "bytes svg send")
+	//fmt.Println(len(picture), "bytes svg send")
 	writer.Write(picture)
 }
